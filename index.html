@@ -1368,6 +1368,7 @@ function setSyncStatus(state){ // 'syncing' | 'saved' | 'error' | 'offline'
 let _fbReady = false; // true once Firebase module is loaded
 let _suppressRemoteUpdate = false; // prevent echo loop when we write
 let _firebaseInitialLoadDone = false; // true after first Firebase snapshot received
+let _clearInProgress = false;         // true while a clear is being written to Firebase
 
 function getFirebase(){
   return {
@@ -1385,9 +1386,11 @@ function saveRosterToStorage(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter, outIds: [...outIds] })); }catch(e){}
 
   if(!window._firebaseDb){ return; } // Firebase not loaded yet
+  if(_clearInProgress){ return; }    // don't let debounce overwrite a clear
 
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
+    if(_clearInProgress){ return; }  // double-check before writing
     setSyncStatus('syncing');
     const { db, ref, set } = getFirebase();
     set(ref(db, 'golfDraw'), {
@@ -1412,13 +1415,12 @@ function subscribeToFirebase(){
   onValue(ref(db, 'golfDraw'), (snapshot) => {
     if(_suppressRemoteUpdate) return;
     const data = snapshot.val();
-    if(!data) {
-      // Firebase has no data (e.g. after a clear) — if this is the first
-      // ever load and we have local data, migrate it up. Otherwise clear.
-      if(!_firebaseInitialLoadDone){
+    if(!data || data.cleared === true) {
+      if(!_firebaseInitialLoadDone && !data){
+        // Nothing ever written — try to migrate from localStorage
         migrateFromLocalStorage();
       } else {
-        // Another device cleared the roster — apply the clear locally too
+        // Another device cleared the roster — apply locally too
         roster = [];
         outIds = new Set();
         idCounter = 0;
@@ -1639,16 +1641,19 @@ clearRosterBtn.addEventListener('click', () => {
   roster = [];
   outIds = new Set();
   idCounter = 0;
+  _clearInProgress = true;          // block saveRosterToStorage debounce
+  clearTimeout(_saveTimer);         // cancel any pending save
   try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
   renderEverything();
   if(window._firebaseDb){
     setSyncStatus('syncing');
     const { db, ref, set } = getFirebase();
-    // Write null — Firebase treats this as "delete the node", which triggers
-    // snapshot.val() === null on all listeners, so every device clears.
-    set(ref(db, 'golfDraw'), null)
-      .then(() => setSyncStatus('saved'))
-      .catch(() => setSyncStatus('error'));
+    // Write a sentinel so all listeners know this is an intentional clear
+    set(ref(db, 'golfDraw'), { cleared: true, roster: [], idCounter: 0, outIds: [] })
+      .then(() => { setSyncStatus('saved'); _clearInProgress = false; })
+      .catch(() => { setSyncStatus('error'); _clearInProgress = false; });
+  } else {
+    _clearInProgress = false;
   }
 });
 
