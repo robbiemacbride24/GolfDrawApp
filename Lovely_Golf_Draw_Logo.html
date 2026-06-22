@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lovey Golf Draw">
+<title>Lovey Golf Section Outing Draw</title>
+
+<!-- ===================================================================
+     LOVEY GOLF SECTION OUTING DRAW
+     Single-file HTML/CSS/JS app. No backend, no build step.
+     Structure of this file:
+       1. <style>  — design tokens + all CSS
+       2. <body>   — setup screen / draw stage / results screen markup
+       3. <script> — state, group logic, animation sequencing
+=================================================================== */-->
+
+<style>
+  /* ============================= DESIGN TOKENS ============================= */
+  :root{
+    /* Color */
+    --fairway:      #0B3D2E;   /* primary deep green */
+    --rough:        #082A20;   /* darkest green, page background */
+    --green-mid:    #145C42;   /* mid green for panels */
+    --line:         #1E5A42;   /* scorecard hairline */
+    --gold:         #C9A24B;   /* trophy gold accent */
+    --gold-bright:  #E9C873;
+    --cream:        #F3EFE3;   /* primary text on dark */
+    --cream-dim:    #CBD9CE;   /* secondary text on dark */
+    --ink:          #0B2A20;   /* text on light/gold surfaces */
+    --white:        #FFFFFF;
+    --buggy:        #7FD1A8;   /* buggy indicator green-cream */
+    --danger:       #D9694F;
+
+    /* Type */
+    --font-display: "Playfair Display", "Iowan Old Style", Georgia, serif;
+    --font-body:    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono:    "DM Mono", "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+
+    /* Layout */
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 8px;
+    --shadow-soft: 0 12px 40px rgba(0,0,0,0.35);
+  }
+
+  @font-face-fallback{} /* placeholder, fonts loaded via @import below */
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,600&family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+  *{ box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0; min-height:100%;
+    font-family: var(--font-body);
+    color: var(--cream);
+    background: var(--rough);
+    -webkit-font-smoothing: antialiased;
+  }
+  body{
+    background:
+      radial-gradient(ellipse 120% 80% at 50% -10%, rgba(201,162,75,0.10), transparent 60%),
+      radial-gradient(ellipse 100% 60% at 80% 110%, rgba(127,209,168,0.06), transparent 60%),
+      linear-gradient(180deg, #0E4633 0%, #082A20 55%, #061F17 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* subtle fairway "mown stripe" texture across the whole app */
+  body::before{
+    content:"";
+    position: fixed; inset:0;
+    pointer-events:none;
+    z-index:0;
+    background: repeating-linear-gradient(
+      115deg,
+      rgba(255,255,255,0.022) 0px,
+      rgba(255,255,255,0.022) 40px,
+      rgba(0,0,0,0.022) 40px,
+      rgba(0,0,0,0.022) 80px
+    );
+  }
+
+  button{ font-family: inherit; cursor:pointer; }
+  input[type="text"]{ font-family: inherit; }
+
+  ::selection{ background: var(--gold); color: var(--ink); }
+
+  /* visible keyboard focus everywhere */
+  a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+    outline: 2px solid var(--gold-bright);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* respect reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+
+  /* ============================= LIGHT MODE OVERRIDE ============================= */
+  body.light-mode{
+    background:
+      radial-gradient(ellipse 120% 80% at 50% -10%, rgba(201,162,75,0.14), transparent 60%),
+      linear-gradient(180deg, #F4F1E6 0%, #E9E6D8 60%, #DCD8C7 100%);
+    color: var(--ink);
+  }
+  body.light-mode .glass{
+    background: rgba(255,255,255,0.55);
+    border-color: rgba(11,61,46,0.14);
+    color: var(--ink);
+  }
+  body.light-mode .eyebrow,
+  body.light-mode .field-label,
+  body.light-mode .table-head{ color: rgba(11,42,32,0.65); }
+  body.light-mode .scorecard-table tbody tr{ border-color: rgba(11,61,46,0.12); }
+  body.light-mode .hero-sub{ color: rgba(11,42,32,0.7); }
+  body.light-mode .app-title{ color: var(--fairway); }
+  body.light-mode .pill-toggle{ background: rgba(11,61,46,0.08); }
+  body.light-mode .pill-toggle button.active{ color: var(--ink); }
+
+  /* ============================= LAYOUT SHELL ============================= */
+  .app-shell{
+    position: relative;
+    z-index: 1;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: calc(36px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(80px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+  }
+  .brand-flag{
+    font-size: 28px;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
+  }
+  .brand-logo{
+    height: 46px;
+    width: auto;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35));
+    flex-shrink: 0;
+  }
+  body.light-mode .brand-logo{ filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15)); }
+  .app-title{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(20px, 3vw, 26px);
+    letter-spacing: 0.2px;
+    color: var(--cream);
+    margin:0;
+    line-height: 1.1;
+  }
+  .app-title .accent{ color: var(--gold-bright); font-style: italic; }
+  .app-subtitle{
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--cream-dim);
+    margin: 2px 0 0;
+  }
+
+  .topbar-controls{ display:flex; align-items:center; gap: 10px; }
+
+  /* dark/light toggle */
+  .mode-toggle{
+    width: 46px; height: 26px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    position: relative;
+    padding: 2px;
+    transition: background 0.25s ease;
+  }
+  .mode-toggle .knob{
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--gold-bright);
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+    display:flex; align-items:center; justify-content:center;
+    font-size: 11px;
+  }
+  body.light-mode .mode-toggle .knob{ transform: translateX(20px); }
+
+  /* ============================= GLASS CARD ============================= */
+  .glass{
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: var(--radius-lg);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .panel{
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 600px){ .panel{ padding: 20px; } }
+
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    margin: 0 0 6px;
+  }
+  .eyebrow::before{
+    content:"";
+    width: 18px; height: 1px;
+    background: var(--gold);
+    display:inline-block;
+  }
+
+  .panel-title{
+    font-family: var(--font-display);
+    font-size: clamp(22px, 3vw, 28px);
+    font-weight: 700;
+    margin: 0 0 18px;
+    color: var(--cream);
+  }
+  body.light-mode .panel-title{ color: var(--fairway); }
+
+  /* ============================= PLAYER INPUT FORM ============================= */
+  .add-player-row{
+    display:flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .field-label{
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--cream-dim);
+    margin-bottom: 6px;
+    display:block;
+  }
+  .input-group{ flex: 1 1 260px; min-width: 200px; }
+  .input-group input[type="text"]{
+    width: 100%;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: var(--cream);
+    padding: 13px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  body.light-mode .input-group input[type="text"]{
+    background: rgba(255,255,255,0.7);
+    border-color: rgba(11,61,46,0.25);
+    color: var(--ink);
+  }
+  .input-group input[type="text"]::placeholder{ color: rgba(243,239,227,0.4); }
+  body.light-mode .input-group input[type="text"]::placeholder{ color: rgba(11,42,32,0.4); }
+  .input-group input[type="text"]:focus{
+    border-color: var(--gold);
+    background: rgba(0,0,0,0.28);
+    outline: none;
+  }
+
+  .buggy-check{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    background: rgba(0,0,0,0.16);
+    border: 1px solid rgba(255,255,255,0.16);
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    user-select: none;
+    white-space: nowrap;
+  }
+  body.light-mode .buggy-check{ background: rgba(255,255,255,0.55); border-color: rgba(11,61,46,0.2); }
+  .buggy-check input[type="checkbox"]{
+    width: 18px; height: 18px;
+    accent-color: var(--gold);
+    cursor:pointer;
+  }
+  .buggy-check label{ cursor:pointer; font-size: 14px; font-weight: 500; }
+
+  /* buttons */
+  .btn{
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 13px 22px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    display:inline-flex;
+    align-items:center;
+    gap: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+    white-space: nowrap;
+  }
+  .btn:active{ transform: translateY(1px) scale(0.99); }
+  .btn:disabled{ opacity: 0.4; cursor: not-allowed; transform:none; }
+
+  .btn-gold{
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+    color: var(--ink);
+    box-shadow: 0 6px 18px rgba(201,162,75,0.35);
+  }
+  .btn-gold:hover:not(:disabled){ box-shadow: 0 8px 24px rgba(201,162,75,0.5); transform: translateY(-1px); }
+
+  .btn-outline{
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: var(--cream);
+  }
+  body.light-mode .btn-outline{ background: rgba(255,255,255,0.5); border-color: rgba(11,61,46,0.3); color: var(--ink); }
+  .btn-outline:hover:not(:disabled){ background: rgba(255,255,255,0.14); }
+
+  .btn-danger-ghost{
+    background: transparent;
+    border: 1px solid rgba(217,105,79,0.5);
+    color: #F0A48F;
+    padding: 13px 20px;
+  }
+  .btn-danger-ghost:hover{ background: rgba(217,105,79,0.12); }
+
+  .btn-block{ width: 100%; justify-content: center; }
+  .btn-lg{ padding: 18px 28px; font-size: 17px; }
+
+  .row-buttons{ display:flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+
+  /* ============================= SCORECARD TABLE ============================= */
+  .scorecard-table{
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 18px;
+    font-family: var(--font-mono);
+  }
+  .scorecard-table thead th{
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--cream-dim);
+    padding: 0 12px 10px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 500;
+  }
+  .scorecard-table tbody tr{
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    animation: rowIn 0.3s ease both;
+  }
+  @keyframes rowIn{ from{ opacity:0; transform: translateX(-6px);} to{ opacity:1; transform:none; } }
+  .scorecard-table tbody td{
+    padding: 13px 12px;
+    font-size: 15px;
+  }
+  .player-name-cell{ font-family: var(--font-body); font-weight: 600; font-size: 15.5px; }
+  .buggy-yes{ color: var(--buggy); font-weight: 600; }
+  .buggy-no{ color: var(--cream-dim); }
+  .row-num{ color: var(--gold); font-weight: 600; width: 30px; }
+
+  .delete-btn{
+    background: transparent;
+    border: 1px solid rgba(217,105,79,0.4);
+    color: #F0A48F;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 15px;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .delete-btn:hover{ background: rgba(217,105,79,0.18); transform: scale(1.05); }
+
+  .empty-state{
+    text-align:center;
+    padding: 36px 20px;
+    color: var(--cream-dim);
+    font-size: 14px;
+  }
+  .empty-state .pin{ font-size: 30px; display:block; margin-bottom: 8px; opacity:0.6; }
+
+  .player-count-badge{
+    display:inline-flex;
+    align-items:center;
+    gap: 8px;
+    background: rgba(201,162,75,0.14);
+    border: 1px solid rgba(201,162,75,0.35);
+    color: var(--gold-bright);
+    padding: 6px 14px;
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+  }
+
+  /* ============================= HANDICAP BADGE ============================= */
+  .hcp-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width: 30px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: rgba(127,209,168,0.16);
+    border: 1px solid rgba(127,209,168,0.35);
+    color: var(--buggy);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  body.light-mode .hcp-badge{ background: rgba(11,61,46,0.08); border-color: rgba(11,61,46,0.2); color: var(--fairway); }
+  .hcp-badge.empty{ opacity: 0.35; }
+
+  /* tappable variant used in the availability list, with a pencil affordance */
+  button.hcp-badge{
+    cursor: pointer;
+    border: none;
+    font-family: var(--font-mono);
+    gap: 4px;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  button.hcp-badge:hover{ background: rgba(127,209,168,0.26); }
+  button.hcp-badge:active{ transform: scale(0.96); }
+  button.hcp-badge .hcp-pencil{ font-size: 10px; opacity: 0.7; }
+
+  .hcp-edit-input{
+    width: 56px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--gold);
+    background: rgba(0,0,0,0.3);
+    color: var(--cream);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    padding: 0 4px;
+  }
+  body.light-mode .hcp-edit-input{ background: rgba(255,255,255,0.85); color: var(--ink); }
+  .hcp-edit-input:focus{ outline: none; box-shadow: 0 0 0 2px rgba(201,162,75,0.35); }
+
+  .input-group input[type="number"]{
+    width: 100%;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: var(--cream);
+    padding: 13px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    font-family: var(--font-mono);
+  }
+  body.light-mode .input-group input[type="number"]{
+    background: rgba(255,255,255,0.7);
+    border-color: rgba(11,61,46,0.25);
+    color: var(--ink);
+  }
+  .input-group input[type="number"]:focus{
+    border-color: var(--gold);
+    background: rgba(0,0,0,0.28);
+    outline: none;
+  }
+  .input-group.input-group-narrow{ flex: 0 1 110px; min-width: 90px; }
+
+  /* ============================= AVAILABILITY ROW (Step 2) ============================= */
+  .avail-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(0,0,0,0.14);
+    border: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 8px;
+    animation: rowIn 0.3s ease both;
+    transition: opacity 0.2s ease, background 0.2s ease;
+  }
+  body.light-mode .avail-row{ background: rgba(255,255,255,0.45); border-color: rgba(11,61,46,0.12); }
+  .avail-row.is-out{ opacity: 0.5; }
+  .avail-row-info{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+  .avail-row-name{
+    font-weight: 600;
+    font-size: 15.5px;
+    overflow:hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .avail-row.is-out .avail-row-name{ text-decoration: line-through; text-decoration-color: rgba(217,105,79,0.6); }
+  .avail-row-actions{ display:flex; align-items:center; gap: 10px; flex-shrink:0; }
+
+  .avail-toggle{
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.08);
+    color: var(--cream);
+    padding: 8px 16px;
+    border-radius: 30px;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    min-width: 76px;
+  }
+  body.light-mode .avail-toggle{ background: rgba(255,255,255,0.6); border-color: rgba(11,61,46,0.22); color: var(--ink); }
+  .avail-toggle.state-in{
+    background: rgba(127,209,168,0.16);
+    border-color: rgba(127,209,168,0.45);
+    color: var(--buggy);
+  }
+  .avail-toggle.state-out{
+    background: rgba(217,105,79,0.14);
+    border-color: rgba(217,105,79,0.4);
+    color: #F0A48F;
+  }
+
+  .buggy-toggle-btn{
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.08);
+    color: var(--cream-dim);
+    padding: 8px 14px;
+    border-radius: 30px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    white-space: nowrap;
+  }
+  body.light-mode .buggy-toggle-btn{ background: rgba(255,255,255,0.6); border-color: rgba(11,61,46,0.22); color: rgba(11,42,32,0.55); }
+  .buggy-toggle-btn.is-active{
+    background: rgba(127,209,168,0.16);
+    border-color: rgba(127,209,168,0.45);
+    color: var(--buggy);
+  }
+
+  .roster-remove-btn{
+    background: transparent;
+    border: none;
+    color: var(--cream-dim);
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 14px;
+    flex-shrink:0;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .roster-remove-btn:hover{ background: rgba(217,105,79,0.16); color: #F0A48F; }
+
+  .avail-bulk-actions{
+    display:flex;
+    gap: 10px;
+    flex-wrap:wrap;
+    margin-bottom: 14px;
+  }
+  .avail-bulk-actions .btn{ padding: 9px 16px; font-size: 13px; }
+
+  .roster-search{
+    width: 100%;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: var(--cream);
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    margin-bottom: 14px;
+  }
+  body.light-mode .roster-search{ background: rgba(255,255,255,0.7); border-color: rgba(11,61,46,0.25); color: var(--ink); }
+  .roster-search::placeholder{ color: rgba(243,239,227,0.4); }
+  body.light-mode .roster-search::placeholder{ color: rgba(11,42,32,0.4); }
+
+  /* ============================= GROUP MODE SELECTOR ============================= */
+  .mode-selector{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 8px;
+  }
+  @media (max-width: 640px){ .mode-selector{ grid-template-columns: 1fr; } }
+
+  .mode-card{
+    background: rgba(0,0,0,0.16);
+    border: 1.5px solid rgba(255,255,255,0.14);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+    position: relative;
+  }
+  body.light-mode .mode-card{ background: rgba(255,255,255,0.5); border-color: rgba(11,61,46,0.16); }
+  .mode-card:hover{ transform: translateY(-2px); }
+  .mode-card.selected{
+    border-color: var(--gold);
+    background: rgba(201,162,75,0.14);
+  }
+  .mode-card-title{
+    font-weight: 700;
+    font-size: 15px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .mode-card-desc{ font-size: 12.5px; color: var(--cream-dim); line-height:1.4; }
+  body.light-mode .mode-card-desc{ color: rgba(11,42,32,0.65); }
+  .mode-card .check-dot{
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    display:inline-block;
+    position: absolute;
+    top: 14px; right: 14px;
+  }
+  .mode-card.selected .check-dot{
+    border-color: var(--gold);
+    background: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201,162,75,0.2);
+  }
+
+  .recommended-tag{
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: var(--gold);
+    color: var(--ink);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-weight: 800;
+    margin-left: 6px;
+  }
+
+  /* ============================= VALIDATION / NOTICE ============================= */
+  .notice{
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    display:flex;
+    gap: 10px;
+    align-items: flex-start;
+    line-height: 1.5;
+  }
+  .notice.warn{
+    background: rgba(217,105,79,0.12);
+    border: 1px solid rgba(217,105,79,0.35);
+    color: #F0A48F;
+  }
+  .notice.info{
+    background: rgba(127,209,168,0.1);
+    border: 1px solid rgba(127,209,168,0.3);
+    color: var(--buggy);
+  }
+
+  /* ============================= FOOTER NOTE ============================= */
+  .footer-note{
+    text-align:center;
+    color: var(--cream-dim);
+    font-size: 12px;
+    margin-top: 30px;
+    letter-spacing: 0.3px;
+  }
+
+  /* =====================================================================
+     FULL-SCREEN DRAW STAGE
+  ===================================================================== */
+  #drawStage{
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display:none;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 18%, rgba(233,200,115,0.10), transparent 55%),
+      radial-gradient(ellipse 140% 90% at 50% 100%, rgba(127,209,168,0.08), transparent 60%),
+      linear-gradient(160deg, #0E4633 0%, #0A3A2B 45%, #061F17 100%);
+  }
+  #drawStage.active{ display:block; }
+
+  /* mown-stripe texture for stage, animated drift for life */
+  .stage-stripes{
+    position:absolute; inset: -10%;
+    background: repeating-linear-gradient(
+      115deg,
+      rgba(255,255,255,0.025) 0px,
+      rgba(255,255,255,0.025) 46px,
+      rgba(0,0,0,0.03) 46px,
+      rgba(0,0,0,0.03) 92px
+    );
+    animation: driftStripes 30s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes driftStripes{ from{ transform: translate(0,0); } to{ transform: translate(-90px, -60px); } }
+
+  .stage-inner{
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    display:flex;
+    flex-direction: column;
+    align-items:center;
+    justify-content:center;
+    padding: 30px;
+    text-align:center;
+  }
+
+  .stage-exit{
+    position: absolute;
+    top: 22px; right: 22px;
+    z-index: 10;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: var(--cream);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 18px;
+  }
+  .stage-exit:hover{ background: rgba(0,0,0,0.5); }
+
+  /* ---- STAGE 1: INTRO ---- */
+  .intro-screen{ display:none; flex-direction:column; align-items:center; gap: 18px; }
+  .intro-screen.show{ display:flex; animation: fadeInUp 0.8s ease both; }
+  .intro-flag{
+    font-size: 64px;
+    animation: flagWave 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 10px 24px rgba(0,0,0,0.4));
+  }
+  @keyframes flagWave{
+    0%, 100%{ transform: rotate(0deg); }
+    25%{ transform: rotate(-6deg); }
+    75%{ transform: rotate(6deg); }
+  }
+  .intro-title{
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(32px, 6vw, 56px);
+    color: var(--cream);
+    margin: 0;
+    line-height: 1.15;
+    text-shadow: 0 6px 30px rgba(0,0,0,0.4);
+  }
+  .intro-title .accent{ color: var(--gold-bright); font-style: italic; }
+  .intro-sub{
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 13px;
+    color: var(--cream-dim);
+  }
+  .intro-loader{
+    margin-top: 14px;
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--gold-bright);
+    font-family: var(--font-mono);
+  }
+  .intro-loader .dot{
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gold-bright);
+    animation: dotPulse 1.2s ease-in-out infinite;
+  }
+  .intro-loader .dot:nth-child(2){ animation-delay: 0.15s; }
+  .intro-loader .dot:nth-child(3){ animation-delay: 0.3s; }
+  @keyframes dotPulse{ 0%, 100%{ opacity:0.25; transform: scale(0.8);} 50%{ opacity:1; transform: scale(1.15);} }
+
+  @keyframes fadeInUp{ from{ opacity:0; transform: translateY(24px); } to{ opacity:1; transform:none; } }
+
+  /* ---- STAGE 2: SHUFFLE ---- */
+  .shuffle-screen{ display:none; flex-direction:column; align-items:center; gap: 30px; width:100%; }
+  .shuffle-screen.show{ display:flex; animation: fadeInUp 0.5s ease both; }
+
+  .shuffle-title{
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 14px;
+    color: var(--gold-bright);
+  }
+
+  .ball-track{
+    position: relative;
+    width: min(560px, 86vw);
+    height: 70px;
+    border-bottom: 3px dashed rgba(255,255,255,0.25);
+  }
+  .golf-ball{
+    position: absolute;
+    bottom: 6px;
+    left: 0;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255,255,255,0.95), rgba(255,255,255,0.55) 35%, rgba(220,220,220,0.9) 60%, rgba(180,180,180,0.9) 100%);
+    box-shadow: 0 10px 16px rgba(0,0,0,0.35), inset 0 -4px 6px rgba(0,0,0,0.15);
+    animation: ballRoll 1.6s linear infinite, ballBounce 0.55s ease-in-out infinite;
+  }
+  .golf-ball::before{
+    /* dimple texture using radial gradients */
+    content:"";
+    position:absolute; inset:0;
+    border-radius: 50%;
+    background-image:
+      radial-gradient(circle, rgba(0,0,0,0.08) 1.5px, transparent 1.6px);
+    background-size: 7px 7px;
+    background-position: 0 0, 3px 3px;
+  }
+  @keyframes ballRoll{
+    0%{ left: 0; transform: rotate(0deg); }
+    100%{ left: calc(100% - 34px); transform: rotate(900deg); }
+  }
+  @keyframes ballBounce{
+    0%, 100%{ bottom: 6px; }
+    50%{ bottom: 22px; }
+  }
+
+  .shuffle-names{
+    position: relative;
+    width: min(560px, 90vw);
+    height: 110px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .shuffle-name{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(28px, 5vw, 44px);
+    color: var(--cream);
+    position: absolute;
+    animation: shufflePop 0.18s ease;
+  }
+  @keyframes shufflePop{
+    from{ opacity:0; transform: scale(0.85) translateY(6px); }
+    to{ opacity:1; transform: scale(1) translateY(0); }
+  }
+
+  .shuffle-progress-track{
+    width: min(420px, 80vw);
+    height: 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.14);
+    overflow:hidden;
+  }
+  .shuffle-progress-fill{
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+    border-radius: 4px;
+    transition: width 0.1s linear;
+  }
+
+  /* ---- STAGE 3: GROUP REVEAL ---- */
+  .reveal-screen{ display:none; flex-direction:column; align-items:center; gap: 22px; width: 100%; }
+  .reveal-screen.show{ display:flex; }
+
+  .reveal-heading-wrap{ min-height: 70px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+  .reveal-drawing-label{
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 14px;
+    color: var(--gold-bright);
+    margin-bottom: 6px;
+    opacity: 0;
+    animation: labelIn 0.5s ease forwards;
+  }
+  @keyframes labelIn{ from{ opacity:0; transform: translateY(-8px);} to{ opacity:1; transform:none; } }
+
+  .reveal-group-title{
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(34px, 7vw, 64px);
+    color: var(--cream);
+    margin: 0;
+    opacity: 0;
+    transform: scale(0.85);
+    animation: groupTitleIn 0.55s cubic-bezier(.22,1,.36,1) forwards;
+    text-shadow: 0 8px 26px rgba(0,0,0,0.4);
+  }
+  @keyframes groupTitleIn{ to{ opacity:1; transform: scale(1); } }
+
+  .reveal-players{
+    display:flex;
+    flex-wrap: wrap;
+    justify-content:center;
+    gap: 16px;
+    max-width: 800px;
+    min-height: 90px;
+  }
+  .reveal-player-chip{
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: clamp(20px, 3.4vw, 30px);
+    color: var(--ink);
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+    padding: 12px 26px;
+    border-radius: 50px;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+    opacity: 0;
+    transform: translateY(26px) scale(0.7);
+    animation: chipIn 0.5s cubic-bezier(.22,1,.36,1) forwards;
+    display:inline-flex;
+    align-items:center;
+    gap: 8px;
+  }
+  @keyframes chipIn{ to{ opacity:1; transform: translateY(0) scale(1); } }
+
+  .reveal-dots{
+    display:flex; gap: 8px; margin-top: 6px;
+  }
+  .reveal-dots .seg{
+    width: 36px; height: 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.18);
+    transition: background 0.3s ease;
+  }
+  .reveal-dots .seg.done{ background: var(--gold); }
+  .reveal-dots .seg.current{ background: var(--gold-bright); animation: dotPulse 1s ease-in-out infinite; }
+
+  /* ---- STAGE 4: FINAL RESULTS ---- */
+  .final-screen{ display:none; flex-direction:column; align-items:center; gap: 26px; width:100%; max-width: 1000px; padding: 10px; }
+  .final-screen.show{ display:flex; animation: fadeInUp 0.6s ease both; }
+
+  .final-heading{
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(28px, 5vw, 44px);
+    margin: 0;
+    color: var(--cream);
+    text-align:center;
+    text-shadow: 0 6px 24px rgba(0,0,0,0.4);
+  }
+  .final-sub{
+    font-family: var(--font-mono);
+    letter-spacing: 1px;
+    color: var(--gold-bright);
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+
+  .final-buggy-warning{
+    background: rgba(217,105,79,0.14);
+    border: 1px solid rgba(217,105,79,0.4);
+    color: #F7BBA8;
+    font-size: 13.5px;
+    padding: 10px 18px;
+    border-radius: 30px;
+    max-width: 560px;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .final-groups-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+    width:100%;
+    max-height: 56vh;
+    overflow-y: auto;
+    padding: 6px 6px 10px;
+  }
+  .final-group-card{
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: var(--radius-md);
+    backdrop-filter: blur(14px);
+    padding: 18px 20px;
+    text-align:left;
+    animation: cardPop 0.5s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes cardPop{ from{ opacity:0; transform: translateY(16px) scale(0.94); } to{ opacity:1; transform:none; } }
+  .final-group-card h3{
+    font-family: var(--font-display);
+    font-size: 19px;
+    margin: 0 0 12px;
+    color: var(--gold-bright);
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .final-group-card ul{ list-style:none; margin:0; padding:0; }
+  .final-group-card li{
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 15.5px;
+    font-weight: 600;
+    display:flex;
+    align-items:center;
+    gap: 6px;
+  }
+  .final-group-card li:last-child{ border-bottom:none; }
+
+  .final-buttons{ display:flex; gap: 14px; flex-wrap:wrap; justify-content:center; margin-top: 6px; }
+
+  /* confetti */
+  .confetti-piece{
+    position: absolute;
+    top: -20px;
+    width: 9px; height: 14px;
+    opacity: 0.9;
+    animation: confettiFall linear forwards;
+    z-index: 5;
+  }
+  @keyframes confettiFall{
+    to{ transform: translateY(112vh) rotate(720deg); opacity: 0.4; }
+  }
+
+  /* scrollbar styling for reveal grid */
+  .final-groups-grid::-webkit-scrollbar{ width: 8px; }
+  .final-groups-grid::-webkit-scrollbar-thumb{ background: rgba(201,162,75,0.5); border-radius: 4px; }
+  .final-groups-grid::-webkit-scrollbar-track{ background: rgba(255,255,255,0.05); }
+
+  /* responsive tweaks */
+  @media (max-width: 480px){
+    .scorecard-table thead th:nth-child(2),
+    .scorecard-table tbody td:nth-child(2){ display:none; } /* hide raw "buggy text" col on tiny screens, icon still shows in name */
+  }
+</style>
+</head>
+<body>
+
+<!-- =====================================================================
+     SETUP SCREEN (player input + group settings)
+===================================================================== -->
+<div class="app-shell" id="setupScreen">
+
+  <div class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="data:image/png;base64,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" alt="Lovey Golf Section logo">
+      <div>
+        <p class="app-title">Lovey Golf <span class="accent">Section</span> Outing Draw</p>
+        <p class="app-subtitle">Group draw &amp; buggy pairing</p>
+      </div>
+    </div>
+    <div class="topbar-controls">
+      <button class="mode-toggle" id="modeToggle" aria-label="Toggle dark mode" title="Toggle dark/light mode">
+        <span class="knob">🌙</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- PLAYER INPUT PANEL -->
+  <div class="glass panel">
+    <p class="eyebrow">Step 1</p>
+    <h2 class="panel-title">Your saved roster</h2>
+    <p style="margin-top:-10px; margin-bottom:18px; font-size:13.5px; color:var(--cream-dim);">Add everyone in the section once — they're saved on this device for next time.</p>
+
+    <form id="addPlayerForm" autocomplete="off">
+      <div style="margin-top:4px;">
+        <span class="field-label">Add players from a list (one per line, optionally "Name, Handicap")</span>
+        <textarea id="bulkPlayerInput" rows="5" style="
+          width:100%;
+          padding:12px;
+          border-radius:8px;
+          border:1px solid rgba(255,255,255,0.2);
+          background: rgba(0,0,0,0.18);
+          color: var(--cream);
+          font-family: var(--font-body);
+          font-size:14px;
+        " ></textarea>
+
+        <button type="button" class="btn btn-outline" id="addBulkBtn" style="margin-top:10px;">
+          + Add List
+        </button>
+      </div>
+      <div class="add-player-row" style="margin-top:18px;">
+        <div class="input-group">
+          <span class="field-label">Player name</span>
+          <input type="text" id="playerNameInput" maxlength="40" required>
+        </div>
+        <div class="input-group input-group-narrow">
+          <span class="field-label">Handicap</span>
+          <input type="number" id="handicapInput" min="0" max="54" step="0.1" placeholder="e.g. 14">
+        </div>
+        <div class="buggy-check">
+          <input type="checkbox" id="buggyCheckbox">
+          <label for="buggyCheckbox">🚗 Needs Buggy/Cart</label>
+        </div>
+        <button type="submit" class="btn btn-gold">+ Add Player</button>
+      </div>
+    </form>
+
+    <div id="validationNotice"></div>
+  </div>
+
+  <!-- AVAILABILITY PANEL -->
+  <div class="glass panel">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div>
+        <p class="eyebrow">Step 2</p>
+        <h2 class="panel-title" style="margin-bottom:0;">Who's playing this outing?</h2>
+      </div>
+      <span class="player-count-badge" id="playerCountBadge">0 players</span>
+    </div>
+    <p style="margin-top:10px; margin-bottom:14px; font-size:13.5px; color:var(--cream-dim);">Everyone defaults to <strong>In</strong>. Tap a name to mark them out if they're not coming — they'll stay saved for next time.</p>
+
+    <input type="text" id="rosterSearch" class="roster-search" placeholder="🔍 Search roster…">
+
+    <div class="avail-bulk-actions">
+      <button type="button" class="btn btn-outline" id="markAllInBtn">✓ Mark all In</button>
+      <button type="button" class="btn btn-outline" id="markAllOutBtn">✕ Mark all Out</button>
+      <button type="button" class="btn btn-danger-ghost" id="clearRosterBtn">🗑 Clear saved roster</button>
+    </div>
+
+    <div id="playerTableWrap"></div>
+  </div>
+
+  <!-- THE FIELD (LIVE DRAW LIST) PANEL -->
+  <div class="glass panel">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div>
+        <p class="eyebrow">Step 3</p>
+        <h2 class="panel-title" style="margin-bottom:0;">In the draw today</h2>
+      </div>
+      <span class="player-count-badge" id="drawCountBadge">0 players</span>
+    </div>
+    <div id="drawListWrap"></div>
+  </div>
+
+  <!-- GROUP SETTINGS PANEL -->
+  <div class="glass panel">
+    <p class="eyebrow">Step 4</p>
+    <h2 class="panel-title">Group format</h2>
+
+    <div class="mode-selector" id="modeSelector">
+      <div class="mode-card selected" data-mode="auto">
+        <span class="check-dot"></span>
+        <div class="mode-card-title">⚙️ Automatic <span class="recommended-tag">Recommended</span></div>
+        <div class="mode-card-desc">Best mix of 3 &amp; 4-balls for the headcount. Avoids 5-balls where possible.</div>
+      </div>
+      <div class="mode-card" data-mode="three">
+        <span class="check-dot"></span>
+        <div class="mode-card-title">3️⃣ Prefer 3-balls</div>
+        <div class="mode-card-desc">Fills groups of 3 first, leaving a smaller final group if needed.</div>
+      </div>
+      <div class="mode-card" data-mode="four">
+        <span class="check-dot"></span>
+        <div class="mode-card-title">4️⃣ Prefer 4-balls</div>
+        <div class="mode-card-desc">Fills groups of 4 first, leaving a smaller final group if needed.</div>
+      </div>
+    </div>
+
+    <div id="groupPreviewNotice"></div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="glass panel">
+    <p class="eyebrow">Step 5</p>
+    <h2 class="panel-title">Run the draw</h2>
+    <button class="btn btn-gold btn-lg btn-block" id="startDrawBtn">🏌️ Start Draw</button>
+    <div class="row-buttons">
+      <button class="btn btn-outline" id="resetBtn" style="flex:1;">↺ Reset outing (keep saved roster)</button>
+    </div>
+  </div>
+
+  <p class="footer-note">Lovey Golf Section · Outing Draw Tool · Built for the big screen 🍻</p>
+</div>
+
+
+<!-- =====================================================================
+     FULL-SCREEN DRAW STAGE (animation sequence lives entirely here)
+===================================================================== -->
+<div id="drawStage">
+  <div class="stage-stripes"></div>
+  <button class="stage-exit" id="stageExitBtn" title="Close" aria-label="Close draw screen">✕</button>
+
+  <div class="stage-inner">
+
+    <!-- STAGE 1: INTRO -->
+    <div class="intro-screen" id="introScreen">
+      <div class="intro-flag">🏌️</div>
+      <h1 class="intro-title">Lovey Golf <span class="accent">Section</span><br>Outing Draw</h1>
+      <p class="intro-sub">Preparing Draw…</p>
+      <div class="intro-loader"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    </div>
+
+    <!-- STAGE 2: SHUFFLE -->
+    <div class="shuffle-screen" id="shuffleScreen">
+      <p class="shuffle-title">Shuffling the field…</p>
+      <div class="shuffle-names" id="shuffleNamesWrap"></div>
+      <div class="ball-track"><div class="golf-ball"></div></div>
+      <div class="shuffle-progress-track"><div class="shuffle-progress-fill" id="shuffleProgressFill"></div></div>
+    </div>
+
+    <!-- STAGE 3: GROUP REVEAL -->
+    <div class="reveal-screen" id="revealScreen">
+      <div class="reveal-heading-wrap">
+        <p class="reveal-drawing-label" id="revealDrawingLabel">Drawing Group 1...</p>
+        <h2 class="reveal-group-title" id="revealGroupTitle">Group 1</h2>
+      </div>
+      <div class="reveal-players" id="revealPlayersWrap"></div>
+      <div class="reveal-dots" id="revealDots"></div>
+    </div>
+
+    <!-- STAGE 4: FINAL RESULTS -->
+    <div class="final-screen" id="finalScreen">
+      <h2 class="final-heading">🏆 Draw Complete! Good luck lads 🍻</h2>
+      <p class="final-sub" id="finalGroupSummary">— groups —</p>
+      <div id="finalBuggyWarning"></div>
+      <div class="final-groups-grid" id="finalGroupsGrid"></div>
+      <div class="final-buttons">
+        <button class="btn btn-gold btn-lg" id="redrawBtn">🔀 Redraw Groups</button>
+        <button class="btn btn-outline btn-lg" id="backToSetupBtn">← Back to Setup</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+/* =====================================================================
+   STATE
+   - roster: the permanent saved list of everyone in the section.
+            { id, name, handicap (number|null), buggy (bool) }
+            Persisted to localStorage so it survives between visits.
+   - outBySession: a Set of roster ids marked "not coming" for THIS outing.
+            Reset each time you reset the outing, but the roster itself
+            is untouched.
+   - players: derived at draw time = roster minus anyone in outBySession.
+===================================================================== */
+const STORAGE_KEY = 'loveyGolfRoster_v1';
+
+let roster = [];           // { id, name, handicap, buggy } — saved permanently
+let outIds = new Set();    // roster ids marked out for this outing
+let groupMode = 'auto';    // 'auto' | 'three' | 'four'
+let currentGroups = [];    // array of arrays of player objects, computed on draw
+let idCounter = 0;
+let rosterSearchTerm = '';
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+/* =====================================================================
+   DOM REFS
+===================================================================== */
+const playerNameInput   = $('#playerNameInput');
+const handicapInput     = $('#handicapInput');
+const buggyCheckbox     = $('#buggyCheckbox');
+const addPlayerForm     = $('#addPlayerForm');
+const bulkPlayerInput   = $('#bulkPlayerInput');
+const addBulkBtn        = $('#addBulkBtn');
+
+const playerTableWrap   = $('#playerTableWrap');
+const playerCountBadge  = $('#playerCountBadge');
+const drawListWrap      = $('#drawListWrap');
+const drawCountBadge    = $('#drawCountBadge');
+const rosterSearch      = $('#rosterSearch');
+const markAllInBtn      = $('#markAllInBtn');
+const markAllOutBtn     = $('#markAllOutBtn');
+const clearRosterBtn    = $('#clearRosterBtn');
+
+const validationNotice   = $('#validationNotice');
+const groupPreviewNotice = $('#groupPreviewNotice');
+const modeSelector       = $('#modeSelector');
+const startDrawBtn       = $('#startDrawBtn');
+const resetBtn           = $('#resetBtn');
+const modeToggle         = $('#modeToggle');
+
+const drawStage      = $('#drawStage');
+const introScreen    = $('#introScreen');
+const shuffleScreen  = $('#shuffleScreen');
+const revealScreen   = $('#revealScreen');
+const finalScreen    = $('#finalScreen');
+const stageExitBtn   = $('#stageExitBtn');
+const redrawBtn      = $('#redrawBtn');
+const backToSetupBtn = $('#backToSetupBtn');
+
+/* =====================================================================
+   PERSISTENCE (localStorage — saved roster lives on this device)
+===================================================================== */
+function saveRosterToStorage(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter }));
+  }catch(e){
+    console.warn('Could not save roster to this device:', e);
+  }
+}
+
+function loadRosterFromStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(Array.isArray(parsed.roster)){
+      roster = parsed.roster.map(p => ({
+        id: p.id,
+        name: p.name,
+        handicap: (p.handicap === null || p.handicap === undefined || p.handicap === '') ? null : Number(p.handicap),
+        buggy: !!p.buggy
+      }));
+    }
+    if(typeof parsed.idCounter === 'number') idCounter = parsed.idCounter;
+  }catch(e){
+    console.warn('Could not load saved roster:', e);
+  }
+}
+
+/* =====================================================================
+   HELPERS
+===================================================================== */
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatHandicap(h){
+  if(h === null || h === undefined || h === '' || Number.isNaN(h)) return null;
+  // show whole numbers cleanly (14 not 14.0), keep one decimal otherwise
+  return (Math.round(h * 10) / 10).toString();
+}
+
+function hcpBadge(h){
+  const formatted = formatHandicap(h);
+  if(formatted === null) return `<span class="hcp-badge empty">—</span>`;
+  return `<span class="hcp-badge" title="Handicap">HCP ${formatted}</span>`;
+}
+
+function showValidation(type, message){
+  validationNotice.innerHTML = `<div class="notice ${type}">⚠️ ${message}</div>`;
+}
+
+function activePlayers(){
+  // the players actually in the draw today: roster minus anyone marked out
+  return roster.filter(p => !outIds.has(p.id));
+}
+
+/* =====================================================================
+   ROSTER MANAGEMENT (Step 1 — add players, saved permanently)
+===================================================================== */
+function addPlayerToRoster(name, handicapRaw, needsBuggy){
+  const trimmed = name.trim();
+  if(!trimmed) return false;
+
+  const dup = roster.some(p => p.name.toLowerCase() === trimmed.toLowerCase());
+  if(dup) return 'dup';
+
+  const handicap = (handicapRaw === '' || handicapRaw === null || handicapRaw === undefined)
+    ? null
+    : Number(handicapRaw);
+
+  roster.push({
+    id: ++idCounter,
+    name: trimmed,
+    handicap: (handicap === null || Number.isNaN(handicap)) ? null : handicap,
+    buggy: !!needsBuggy
+  });
+  saveRosterToStorage();
+  renderEverything();
+  return true;
+}
+
+function removeFromRoster(id){
+  roster = roster.filter(p => p.id !== id);
+  outIds.delete(id);
+  saveRosterToStorage();
+  renderEverything();
+}
+
+addPlayerForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if(!playerNameInput.value.trim()){
+    showValidation('warn', 'Enter a name before adding a player.');
+    return;
+  }
+  const result = addPlayerToRoster(playerNameInput.value, handicapInput.value, buggyCheckbox.checked);
+  if(result === 'dup'){
+    showValidation('warn', 'That name is already on the roster — add a surname/initial to tell them apart.');
+    return;
+  }
+  playerNameInput.value = '';
+  handicapInput.value = '';
+  buggyCheckbox.checked = false;
+  validationNotice.innerHTML = '';
+  playerNameInput.focus();
+});
+
+addBulkBtn.addEventListener('click', () => {
+  const lines = bulkPlayerInput.value.split('\n');
+  let added = 0, skipped = 0;
+
+  lines.forEach(line => {
+    const raw = line.trim();
+    if(!raw) return;
+
+    // support "Name, Handicap" or just "Name"
+    let name = raw;
+    let handicap = null;
+    const commaIdx = raw.lastIndexOf(',');
+    if(commaIdx !== -1){
+      const possibleHcp = raw.slice(commaIdx + 1).trim();
+      const num = Number(possibleHcp);
+      if(possibleHcp !== '' && !Number.isNaN(num)){
+        name = raw.slice(0, commaIdx).trim();
+        handicap = num;
+      }
+    }
+    if(!name) return;
+
+    const exists = roster.some(p => p.name.toLowerCase() === name.toLowerCase());
+    if(exists){ skipped++; return; }
+
+    roster.push({ id: ++idCounter, name, handicap, buggy: false });
+    added++;
+  });
+
+  if(added === 0){
+    showValidation('warn', skipped > 0 ? `No new players added — ${skipped} name${skipped === 1 ? '' : 's'} already on the roster.` : 'No new players added (empty lines only).');
+    return;
+  }
+
+  bulkPlayerInput.value = '';
+  validationNotice.innerHTML = skipped > 0
+    ? `<div class="notice info">✅ Added ${added} player${added === 1 ? '' : 's'} · skipped ${skipped} duplicate${skipped === 1 ? '' : 's'}.</div>`
+    : '';
+  saveRosterToStorage();
+  renderEverything();
+});
+
+clearRosterBtn.addEventListener('click', () => {
+  if(roster.length === 0) return;
+  const confirmed = confirm('This will permanently delete your entire saved roster from this device. Continue?');
+  if(!confirmed) return;
+  roster = [];
+  outIds.clear();
+  saveRosterToStorage();
+  renderEverything();
+});
+
+/* =====================================================================
+   INLINE HANDICAP EDITING (tap the HCP badge in Step 2)
+===================================================================== */
+function startHandicapEdit(triggerBtn){
+  const id = Number(triggerBtn.dataset.id);
+  const player = roster.find(p => p.id === id);
+  if(!player) return;
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.max = '54';
+  input.step = '0.1';
+  input.className = 'hcp-edit-input';
+  input.value = player.handicap === null ? '' : player.handicap;
+  input.placeholder = 'Hcp';
+
+  triggerBtn.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let settled = false;
+  function commit(){
+    if(settled) return;
+    settled = true;
+    const raw = input.value.trim();
+    const num = Number(raw);
+    player.handicap = (raw === '' || Number.isNaN(num)) ? null : num;
+    saveRosterToStorage();
+    renderEverything();
+  }
+  function cancel(){
+    if(settled) return;
+    settled = true;
+    renderEverything(); // just re-render, discarding the edit
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); commit(); }
+    if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+  });
+}
+
+/* =====================================================================
+   AVAILABILITY (Step 2 — who's playing this outing)
+===================================================================== */
+function renderAvailabilityList(){
+  playerCountBadge.textContent = `${roster.length} player${roster.length === 1 ? '' : 's'}`;
+
+  if(roster.length === 0){
+    playerTableWrap.innerHTML = `
+      <div class="empty-state">
+        <span class="pin">⛳</span>
+        No players saved yet. Add your section's golfers above — you'll only need to do this once.
+      </div>`;
+    return;
+  }
+
+  const term = rosterSearchTerm.trim().toLowerCase();
+  const visibleRoster = term
+    ? roster.filter(p => p.name.toLowerCase().includes(term))
+    : roster;
+
+  if(visibleRoster.length === 0){
+    playerTableWrap.innerHTML = `
+      <div class="empty-state">
+        <span class="pin">🔍</span>
+        No saved players match "${escapeHtml(rosterSearchTerm)}".
+      </div>`;
+    return;
+  }
+
+  const sorted = [...visibleRoster].sort((a, b) => a.name.localeCompare(b.name));
+
+  playerTableWrap.innerHTML = sorted.map(p => {
+    const isOut = outIds.has(p.id);
+    return `
+      <div class="avail-row ${isOut ? 'is-out' : ''}" data-id="${p.id}">
+        <div class="avail-row-info">
+          <span class="avail-row-name">${escapeHtml(p.name)}</span>
+          <button type="button" class="hcp-badge hcp-edit-trigger ${p.handicap === null ? 'empty' : ''}" data-id="${p.id}" title="Tap to edit handicap">${formatHandicap(p.handicap) === null ? '— HCP' : `HCP ${formatHandicap(p.handicap)}`} <span class="hcp-pencil">✎</span></button>
+        </div>
+        <div class="avail-row-actions">
+          <button type="button" class="buggy-toggle-btn ${p.buggy ? 'is-active' : ''}" data-id="${p.id}" title="Toggle buggy requirement">
+            🚗 ${p.buggy ? 'Buggy' : 'No buggy'}
+          </button>
+          <button type="button" class="avail-toggle ${isOut ? 'state-out' : 'state-in'}" data-id="${p.id}">
+            ${isOut ? 'Out' : 'In'}
+          </button>
+          <button type="button" class="roster-remove-btn" data-id="${p.id}" aria-label="Remove ${escapeHtml(p.name)} from saved roster" title="Remove from saved roster">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  playerTableWrap.querySelectorAll('.hcp-edit-trigger').forEach(btn => {
+    btn.addEventListener('click', () => startHandicapEdit(btn));
+  });
+
+  playerTableWrap.querySelectorAll('.buggy-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.id);
+      const player = roster.find(p => p.id === id);
+      if(player){
+        player.buggy = !player.buggy;
+        saveRosterToStorage();
+        renderEverything();
+      }
+    });
+  });
+
+  playerTableWrap.querySelectorAll('.avail-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.id);
+      if(outIds.has(id)) outIds.delete(id);
+      else outIds.add(id);
+      renderEverything();
+    });
+  });
+  playerTableWrap.querySelectorAll('.roster-remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => removeFromRoster(Number(btn.dataset.id)));
+  });
+}
+
+rosterSearch.addEventListener('input', () => {
+  rosterSearchTerm = rosterSearch.value;
+  renderAvailabilityList();
+});
+
+markAllInBtn.addEventListener('click', () => {
+  outIds.clear();
+  renderEverything();
+});
+markAllOutBtn.addEventListener('click', () => {
+  roster.forEach(p => outIds.add(p.id));
+  renderEverything();
+});
+
+/* =====================================================================
+   THE FIELD (Step 3 — live list of who's actually in today's draw)
+===================================================================== */
+function renderDrawList(){
+  const today = activePlayers();
+  drawCountBadge.textContent = `${today.length} player${today.length === 1 ? '' : 's'}`;
+
+  if(today.length === 0){
+    drawListWrap.innerHTML = `
+      <div class="empty-state">
+        <span class="pin">⛳</span>
+        Nobody's marked "In" yet — mark players In above to add them to today's draw.
+      </div>`;
+    updateGroupPreview();
+    return;
+  }
+
+  const sorted = [...today].sort((a, b) => a.name.localeCompare(b.name));
+  let rows = sorted.map((p, i) => `
+    <tr>
+      <td class="row-num">${i + 1}</td>
+      <td class="player-name-cell">${escapeHtml(p.name)} ${p.buggy ? '<span title="Needs Buggy/Cart">🚗</span>' : ''}</td>
+      <td>${hcpBadge(p.handicap)}</td>
+    </tr>
+  `).join('');
+
+  drawListWrap.innerHTML = `
+    <table class="scorecard-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Hcp</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  updateGroupPreview();
+}
+
+function renderEverything(){
+  renderAvailabilityList();
+  renderDrawList();
+}
+
+/* =====================================================================
+   GROUP MODE SELECTION
+===================================================================== */
+modeSelector.addEventListener('click', (e) => {
+  const card = e.target.closest('.mode-card');
+  if(!card) return;
+  $$('.mode-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  groupMode = card.dataset.mode;
+  updateGroupPreview();
+});
+
+/* =====================================================================
+   GROUP SIZE PLANNING
+   Returns an array of integers representing group sizes, e.g. [4,4,4]
+===================================================================== */
+function planGroupSizes(totalPlayers, mode){
+  if(totalPlayers === 0) return [];
+
+  if(mode === 'three'){
+    return planPreferSize(totalPlayers, 3);
+  }
+  if(mode === 'four'){
+    return planPreferSize(totalPlayers, 4);
+  }
+  // AUTOMATIC: choose the best mix of 4s and 3s, avoiding 5-balls unless unavoidable
+  return planAutomatic(totalPlayers);
+}
+
+// Build sizes preferring a target size (3 or 4), last group absorbs remainder,
+// avoiding groups smaller than 2 by borrowing from the previous group.
+function planPreferSize(total, target){
+  if(total <= 0) return [];
+  if(total <= target + 1 && total >= 2){
+    // small total — just one group (covers e.g. 5 players preferring 4s -> one 5-ball)
+    return [total];
+  }
+  if(total < 2) return [total]; // single straggler, nothing we can do
+
+  let sizes = [];
+  let remaining = total;
+  while(remaining > 0){
+    if(remaining === target){ sizes.push(target); remaining = 0; }
+    else if(remaining > target){ sizes.push(target); remaining -= target; }
+    else { // remaining < target and > 0 -> remainder group
+      sizes.push(remaining);
+      remaining = 0;
+    }
+  }
+  // fix a trailing group of 1 by borrowing one player from the previous group
+  if(sizes.length > 1 && sizes[sizes.length - 1] === 1){
+    sizes[sizes.length - 1] = 2;
+    sizes[sizes.length - 2] -= 1;
+  }
+  return sizes;
+}
+
+// Automatic: prefer a clean mix of 4-balls and 3-balls, avoid 5-balls unless necessary.
+function planAutomatic(total){
+  if(total < 2) return [total];
+
+  // Try combinations of 4s and 3s that exactly sum to total, preferring
+  // the maximum number of 4-balls (closer to "3 x 4-balls" style outcomes),
+  // then falling back to allow exactly one non-4/3 group only if truly unavoidable.
+  let best = null; // { fours, threes }
+  for(let fours = Math.floor(total / 4); fours >= 0; fours--){
+    let remainder = total - fours * 4;
+    if(remainder % 3 === 0){
+      const threes = remainder / 3;
+      best = { fours, threes };
+      break; // first match scanning from max fours = most 4-balls possible
+    }
+  }
+
+  if(best){
+    let sizes = [];
+    for(let i = 0; i < best.fours; i++) sizes.push(4);
+    for(let i = 0; i < best.threes; i++) sizes.push(3);
+    return sortGroupSizesNicely(sizes);
+  }
+
+  // No exact 4/3 combination exists (true only for total = 1,2,5 since
+  // every integer >= 6 can be made from 3s and 4s). Handle small edge cases:
+  if(total === 5) return [5];          // unavoidable 5-ball
+  if(total === 2) return [2];
+  if(total === 1) return [1];
+
+  // Fallback safety net (shouldn't be reached for total >= 6)
+  return planPreferSize(total, 4);
+}
+
+function sortGroupSizesNicely(sizes){
+  // present 3-balls before 4-balls so they tee off first for speed of play
+  return sizes.sort((a, b) => a - b);
+}
+
+function updateGroupPreview(){
+  const today = activePlayers();
+  const total = today.length;
+  if(total === 0){
+    groupPreviewNotice.innerHTML = '';
+    startDrawBtn.disabled = true;
+    return;
+  }
+  const sizes = planGroupSizes(total, groupMode);
+  const summary = sizes.map(s => `${s}-ball`).join(' + ');
+  const hasFive = sizes.includes(5);
+
+  let html = `<div class="notice info">⛳ <strong>${total} players</strong> → ${sizes.length} group${sizes.length === 1 ? '' : 's'}: ${summary}</div>`;
+  if(hasFive){
+    html += `<div class="notice warn">⚠️ A 5-ball is unavoidable with this headcount/format combination.</div>`;
+  }
+
+  // warn ahead of time if there are more buggy pairs than groups —
+  // in that case two buggy pairs will be forced to share one group,
+  // since every pair must stay together and a group can't be split.
+  const buggyCount = today.filter(p => p.buggy).length;
+  const pairCount = Math.floor(buggyCount / 2);
+  if(pairCount > sizes.length){
+    html += `<div class="notice warn">⚠️ ${pairCount} buggy pairs but only ${sizes.length} group${sizes.length === 1 ? '' : 's'} — at least one group will need to take two buggy pairs, since pairs can't be split up.</div>`;
+  }
+
+  groupPreviewNotice.innerHTML = html;
+
+  startDrawBtn.disabled = total < 2;
+}
+
+/* =====================================================================
+   GROUP FORMATION (buggy-aware random draw)
+===================================================================== */
+
+function shuffleArray(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/*
+  Buggy rule logic:
+  - All buggy-needing players are randomly paired into 2s (a "buggy pair").
+  - If there's an odd one out, they go in as a solo "buggy unit" of 1.
+  - Each buggy unit (pair or solo) is treated as an atomic block when filling
+    groups — it can never be split across two groups.
+  - RULE: two different buggy pairs must not share the same group, wherever
+    that's mathematically possible (each pair gets its own group). This is
+    enforced as a hard preference, not just a tiebreaker — pairs are placed
+    into pair-free groups first, and only double up as an absolute last
+    resort if there genuinely isn't enough group capacity to give every
+    pair its own group (e.g. more buggy pairs than groups available).
+  - Non-buggy players fill in around the buggy units as single units.
+  - Sets lastDrawHadDoubledBuggyGroup so the UI can warn if doubling-up
+    was unavoidable.
+*/
+let lastDrawHadDoubledBuggyGroup = false; // exposed for UI warning after a draw
+
+function formGroups(playerList, sizes){
+  if(playerList.length === 0) return [];
+  lastDrawHadDoubledBuggyGroup = false;
+
+  const buggyPlayers    = shuffleArray(playerList.filter(p => p.buggy));
+  const nonBuggyPlayers = shuffleArray(playerList.filter(p => !p.buggy));
+
+  // build buggy units (pairs, plus a possible solo leftover)
+  let pairUnits = [];
+  let soloBuggyUnits = [];
+  for(let i = 0; i < buggyPlayers.length; i += 2){
+    if(i + 1 < buggyPlayers.length){
+      pairUnits.push({ players: [buggyPlayers[i], buggyPlayers[i+1]], isBuggyPair: true, size: 2 });
+    } else {
+      soloBuggyUnits.push({ players: [buggyPlayers[i]], isBuggyPair: false, size: 1 }); // odd one out, solo
+    }
+  }
+  pairUnits = shuffleArray(pairUnits);
+
+  // non-buggy players are single-player units
+  let nonBuggyUnits = shuffleArray(nonBuggyPlayers.map(p => ({ players: [p], isBuggyPair: false, size: 1 })));
+
+  // prepare empty groups according to planned sizes (order randomized so
+  // "Group 1" isn't predictably the biggest group every time)
+  const groupTargets = [...sizes].sort((a, b) => a - b);
+  const groups = groupTargets.map(size => ({ target: size, players: [], hasBuggyPair: false }));
+
+  // ---- PASS 1: place buggy PAIRS first, one per group, never doubling up
+  //      unless there is truly no group left without a pair already in it.
+  const unplacedPairs = [];
+  pairUnits.forEach(unit => {
+    // groups with room AND no buggy pair yet
+    let candidates = groups.filter(g => g.players.length + unit.size <= g.target && !g.hasBuggyPair);
+    if(candidates.length === 0){
+      // no pair-free group has room — fall back to ANY group with room,
+      // even if it already has a pair (this is the doubling-up we want to avoid)
+      candidates = groups.filter(g => g.players.length + unit.size <= g.target);
+    }
+    if(candidates.length > 0){
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      if(chosen.hasBuggyPair) lastDrawHadDoubledBuggyGroup = true;
+      chosen.players.push(...unit.players);
+      chosen.hasBuggyPair = true;
+    } else {
+      unplacedPairs.push(unit); // no room anywhere yet — handle in leftover pass
+    }
+  });
+
+  // ---- PASS 2: place solo buggy units and non-buggy units into remaining space
+  const remainingUnits = shuffleArray([...soloBuggyUnits, ...nonBuggyUnits]);
+  const leftovers = [];
+  remainingUnits.forEach(unit => {
+    const candidates = groups.filter(g => g.players.length + unit.size <= g.target);
+    if(candidates.length > 0){
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      chosen.players.push(...unit.players);
+    } else {
+      leftovers.push(unit);
+    }
+  });
+
+  // ---- PASS 3: place any unplaced buggy pairs (capacity was full in pass 1)
+  //      plus any other leftovers, into whichever group has the most free
+  //      room — this never splits a pair, but may force two pairs into one
+  //      group if there simply aren't enough groups to go around.
+  [...unplacedPairs, ...leftovers].forEach(unit => {
+    groups.sort((a, b) => (a.target - a.players.length) - (b.target - b.players.length));
+    const target = groups[groups.length - 1]; // most free room
+    if(unit.isBuggyPair && target.hasBuggyPair) lastDrawHadDoubledBuggyGroup = true;
+    target.players.push(...unit.players);
+    if(unit.isBuggyPair) target.hasBuggyPair = true;
+  });
+
+  // sort so smaller groups (3-balls) come first — they tee off first for speed of play
+  return groups.map(g => g.players);
+}
+
+/* =====================================================================
+   FULL DRAW SEQUENCE — orchestrates Stage 1 → 2 → 3 → 4
+===================================================================== */
+
+function showStageScreen(screenEl){
+  [introScreen, shuffleScreen, revealScreen, finalScreen].forEach(s => s.classList.remove('show'));
+  screenEl.classList.add('show');
+}
+
+function runDraw(){
+  // compute groups fresh from today's active players
+  const today = activePlayers();
+  const sizes = planGroupSizes(today.length, groupMode);
+  currentGroups = formGroups(today, sizes);
+
+  drawStage.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  runStage1Intro();
+}
+
+/* ---- STAGE 1: INTRO ---- */
+function runStage1Intro(){
+  showStageScreen(introScreen);
+  setTimeout(() => {
+    runStage2Shuffle();
+  }, 2200);
+}
+
+/* ---- STAGE 2: SHUFFLE ---- */
+function runStage2Shuffle(){
+  showStageScreen(shuffleScreen);
+  const namesWrap = $('#shuffleNamesWrap');
+  const fill = $('#shuffleProgressFill');
+  namesWrap.innerHTML = '';
+  fill.style.width = '0%';
+
+  const allNames = activePlayers().map(p => p.name);
+  const duration = 4000; // 4 seconds of shuffling
+  const tickRate = 110;
+  let elapsed = 0;
+
+  const interval = setInterval(() => {
+    elapsed += tickRate;
+    const randomName = allNames[Math.floor(Math.random() * allNames.length)];
+    namesWrap.innerHTML = `<span class="shuffle-name">${escapeHtml(randomName)}</span>`;
+    fill.style.width = `${Math.min(100, (elapsed / duration) * 100)}%`;
+
+    if(elapsed >= duration){
+      clearInterval(interval);
+      runStage3Reveal();
+    }
+  }, tickRate);
+}
+
+/* ---- STAGE 3: GROUP REVEAL ---- */
+function runStage3Reveal(){
+  showStageScreen(revealScreen);
+
+  const drawingLabel = $('#revealDrawingLabel');
+  const groupTitle   = $('#revealGroupTitle');
+  const playersWrap  = $('#revealPlayersWrap');
+  const dotsWrap     = $('#revealDots');
+
+  // build progress dots, one per group
+  dotsWrap.innerHTML = currentGroups.map((_, i) => `<span class="seg" data-i="${i}"></span>`).join('');
+
+  let groupIndex = 0;
+
+  function revealNextGroup(){
+    if(groupIndex >= currentGroups.length){
+      setTimeout(runStage4Final, 900);
+      return;
+    }
+
+    const group = currentGroups[groupIndex];
+
+    // update dots
+    dotsWrap.querySelectorAll('.seg').forEach((seg, i) => {
+      seg.classList.toggle('done', i < groupIndex);
+      seg.classList.toggle('current', i === groupIndex);
+    });
+
+    // re-trigger label/title entrance animations
+    drawingLabel.style.animation = 'none';
+    groupTitle.style.animation = 'none';
+    playersWrap.innerHTML = '';
+    // force reflow so animations restart
+    void drawingLabel.offsetWidth;
+    void groupTitle.offsetWidth;
+
+    drawingLabel.textContent = `Drawing Group ${groupIndex + 1}...`;
+    groupTitle.textContent = `Group ${groupIndex + 1}`;
+    drawingLabel.style.animation = 'labelIn 0.5s ease forwards';
+    groupTitle.style.animation = 'groupTitleIn 0.55s cubic-bezier(.22,1,.36,1) forwards';
+
+    // reveal players one by one, ~1s apart, after a brief pause for the title
+    let playerIndex = 0;
+    setTimeout(function revealNextPlayer(){
+      if(playerIndex >= group.length){
+        // small pause, then move to next group
+        setTimeout(() => {
+          groupIndex++;
+          revealNextGroup();
+        }, 1100);
+        return;
+      }
+      const p = group[playerIndex];
+      const chip = document.createElement('span');
+      chip.className = 'reveal-player-chip';
+      const hcpText = formatHandicap(p.handicap);
+      chip.innerHTML = `${escapeHtml(p.name)} ${p.buggy ? '🚗' : ''}${hcpText !== null ? ` <span style="font-size:0.55em; opacity:0.7; font-weight:600;">(HCP ${hcpText})</span>` : ''}`;
+      playersWrap.appendChild(chip);
+      playerIndex++;
+      setTimeout(revealNextPlayer, 950);
+    }, 700);
+  }
+
+  revealNextGroup();
+}
+
+/* ---- STAGE 4: FINAL RESULTS ---- */
+function runStage4Final(){
+  showStageScreen(finalScreen);
+
+  const grid = $('#finalGroupsGrid');
+  const summary = $('#finalGroupSummary');
+  const buggyWarning = $('#finalBuggyWarning');
+
+  const today = activePlayers();
+  summary.textContent = `${today.length} players · ${currentGroups.length} groups`;
+
+  // only show this if two buggy pairs were genuinely forced into one group
+  // because there weren't enough groups to give each pair its own
+  buggyWarning.innerHTML = lastDrawHadDoubledBuggyGroup
+    ? `<div class="final-buggy-warning">⚠️ More buggy pairs than groups this time — one group has two buggy pairs in it, since pairs can't be split up.</div>`
+    : '';
+
+  grid.innerHTML = currentGroups.map((group, i) => {
+    const items = group.map(p => {
+      const hcpText = formatHandicap(p.handicap);
+      return `<li>${p.buggy ? '🚗' : '⛳'} ${escapeHtml(p.name)}${hcpText !== null ? ` <span style="margin-left:auto; font-size:12.5px; color:var(--gold-bright); font-weight:700;">HCP ${hcpText}</span>` : ''}</li>`;
+    }).join('');
+    return `
+      <div class="final-group-card" style="animation-delay:${i * 0.08}s">
+        <h3>⛳ Group ${i + 1} <span style="font-size:12px; color:var(--cream-dim); font-weight:500;">(${group.length}-ball)</span></h3>
+        <ul>${items}</ul>
+      </div>`;
+  }).join('');
+
+  launchConfetti();
+}
+
+/* =====================================================================
+   CONFETTI
+===================================================================== */
+function launchConfetti(){
+  const colors = ['#C9A24B', '#E9C873', '#F3EFE3', '#7FD1A8', '#FFFFFF'];
+  const container = $('.stage-inner');
+  for(let i = 0; i < 90; i++){
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDuration = `${2.2 + Math.random() * 1.8}s`;
+    piece.style.animationDelay = `${Math.random() * 0.6}s`;
+    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+    if(Math.random() > 0.5) piece.style.borderRadius = '50%';
+    container.appendChild(piece);
+    setTimeout(() => piece.remove(), 4500);
+  }
+}
+
+/* =====================================================================
+   STAGE CONTROLS
+===================================================================== */
+startDrawBtn.addEventListener('click', () => {
+  if(activePlayers().length < 2){
+    showValidation('warn', 'You need at least 2 players marked "In" before starting the draw.');
+    return;
+  }
+  runDraw();
+});
+
+redrawBtn.addEventListener('click', () => {
+  runStage1Intro(); // re-run full animated sequence with a fresh random draw
+});
+
+function exitStage(){
+  drawStage.classList.remove('active');
+  document.body.style.overflow = '';
+  [introScreen, shuffleScreen, revealScreen, finalScreen].forEach(s => s.classList.remove('show'));
+  // clean up any leftover confetti
+  $$('.confetti-piece').forEach(el => el.remove());
+}
+stageExitBtn.addEventListener('click', exitStage);
+backToSetupBtn.addEventListener('click', exitStage);
+
+/* =====================================================================
+   RESET (clears today's outing only — saved roster is untouched)
+===================================================================== */
+resetBtn.addEventListener('click', () => {
+  if(roster.length === 0) return;
+  const confirmed = confirm('This clears who\'s marked In/Out for today and resets the group format. Your saved roster of names stays put. Continue?');
+  if(!confirmed) return;
+  outIds.clear();
+  groupMode = 'auto';
+  $$('.mode-card').forEach(c => c.classList.remove('selected'));
+  $('.mode-card[data-mode="auto"]').classList.add('selected');
+  currentGroups = [];
+  validationNotice.innerHTML = '';
+  renderEverything();
+});
+
+/* =====================================================================
+   DARK / LIGHT MODE
+===================================================================== */
+modeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('light-mode');
+  const isLight = document.body.classList.contains('light-mode');
+  modeToggle.querySelector('.knob').textContent = isLight ? '☀️' : '🌙';
+});
+
+/* =====================================================================
+   INIT
+===================================================================== */
+loadRosterFromStorage();
+renderEverything();
+</script>
+
+</body>
+</html>
