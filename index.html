@@ -1367,6 +1367,7 @@ function setSyncStatus(state){ // 'syncing' | 'saved' | 'error' | 'offline'
 
 let _fbReady = false; // true once Firebase module is loaded
 let _suppressRemoteUpdate = false; // prevent echo loop when we write
+let _firebaseInitialLoadDone = false; // true after first Firebase snapshot received
 
 function getFirebase(){
   return {
@@ -1412,11 +1413,23 @@ function subscribeToFirebase(){
     if(_suppressRemoteUpdate) return;
     const data = snapshot.val();
     if(!data) {
-      // Nothing in Firebase yet — try to migrate from localStorage
-      migrateFromLocalStorage();
+      // Firebase has no data (e.g. after a clear) — if this is the first
+      // ever load and we have local data, migrate it up. Otherwise clear.
+      if(!_firebaseInitialLoadDone){
+        migrateFromLocalStorage();
+      } else {
+        // Another device cleared the roster — apply the clear locally too
+        roster = [];
+        outIds = new Set();
+        idCounter = 0;
+        try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+        renderEverything();
+      }
+      _firebaseInitialLoadDone = true;
       setSyncStatus('saved');
       return;
     }
+    _firebaseInitialLoadDone = true;
     // Apply remote state
     if(Array.isArray(data.roster)){
       roster = data.roster.map(p => ({
@@ -1624,18 +1637,19 @@ clearRosterBtn.addEventListener('click', () => {
   const confirmed = confirm('This will permanently delete your entire saved roster from this device. Continue?');
   if(!confirmed) return;
   roster = [];
-  outIds.clear();
+  outIds = new Set();
   idCounter = 0;
-  // Write the cleared state explicitly so all devices update
   try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  renderEverything();
   if(window._firebaseDb){
     setSyncStatus('syncing');
     const { db, ref, set } = getFirebase();
-    set(ref(db, 'golfDraw'), { roster: [], idCounter: 0, outIds: [] })
+    // Write null — Firebase treats this as "delete the node", which triggers
+    // snapshot.val() === null on all listeners, so every device clears.
+    set(ref(db, 'golfDraw'), null)
       .then(() => setSyncStatus('saved'))
       .catch(() => setSyncStatus('error'));
   }
-  renderEverything();
 });
 
 /* =====================================================================
