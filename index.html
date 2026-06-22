@@ -1685,9 +1685,11 @@ function setSyncStatus(state){ // 'syncing' | 'saved' | 'error' | 'offline'
 }
 
 let _fbReady = false; // true once Firebase module is loaded
-let _suppressRemoteUpdate = false; // prevent echo loop when we write
 let _firebaseInitialLoadDone = false; // true after first Firebase snapshot received
 let _clearInProgress = false;         // true while a clear is being written to Firebase
+let _lastLocalWriteId = 0;   // incremented each time THIS device writes
+let _pendingWriteId = 0;     // the writeId currently in-flight or last sent
+let _fbSubscribed = false;   // guard: only register onValue once
 
 function getFirebase(){
   return {
@@ -1698,7 +1700,19 @@ function getFirebase(){
   };
 }
 
-// Save roster + outIds to Firebase (debounced)
+// Low-level write to Firebase — stamps a unique writeId so we can ignore our own echo
+function _writeToFirebase(payload){
+  if(!window._firebaseDb) return Promise.resolve();
+  const writeId = ++_lastLocalWriteId;
+  _pendingWriteId = writeId;
+  setSyncStatus('syncing');
+  const { db, ref, set } = getFirebase();
+  return set(ref(db, 'golfDraw'), { ...payload, _writeId: writeId })
+    .then(() => { setSyncStatus('saved'); })
+    .catch(err => { console.warn('Firebase save failed:', err); setSyncStatus('error'); });
+}
+
+// Save roster + outIds to Firebase (debounced for rapid individual toggles)
 let _saveTimer = null;
 function saveRosterToStorage(){
   // Always keep a local backup too
@@ -1709,36 +1723,27 @@ function saveRosterToStorage(){
 
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
-    if(_clearInProgress){ _suppressRemoteUpdate = false; return; }
-    _suppressRemoteUpdate = true; // block echo from Firebase listener while write is in flight
-    setSyncStatus('syncing');
-    const { db, ref, set } = getFirebase();
-    set(ref(db, 'golfDraw'), {
-      roster,
-      idCounter,
-      outIds: [...outIds]
-    }).then(() => {
-      setSyncStatus('saved');
-      // Small delay before re-enabling remote updates so the echo from our own
-      // write (which Firebase sends back) is ignored before other devices' changes come in
-      setTimeout(() => { _suppressRemoteUpdate = false; }, 600);
-    }).catch(err => {
-      console.warn('Firebase save failed:', err);
-      setSyncStatus('error');
-      _suppressRemoteUpdate = false;
-    });
+    if(_clearInProgress){ return; }
+    _writeToFirebase({ roster, idCounter, outIds: [...outIds] });
   }, 400);
 }
 
 // Listen for remote changes from other users and apply them
 function subscribeToFirebase(){
   if(!window._firebaseDb) return;
+  if(_fbSubscribed) return; // CRITICAL: prevent duplicate listeners (caused double-firing bug)
+  _fbSubscribed = true;
   const { db, ref, onValue } = getFirebase();
   setSyncStatus('syncing');
 
   subscribeToHistory();
   onValue(ref(db, 'golfDraw'), (snapshot) => {
-    if(_suppressRemoteUpdate) return;
+    const data = snapshot.val();
+    // Ignore echoes of our own writes using the writeId stamp
+    if(data && typeof data._writeId === 'number' && data._writeId === _pendingWriteId){
+      console.log('[Firebase] Ignoring echo of our own write (writeId:', data._writeId, ')');
+      return;
+    }
     const data = snapshot.val();
     if(!data || data.cleared === true) {
       if(!_firebaseInitialLoadDone && !data){
@@ -1768,7 +1773,7 @@ function subscribeToFirebase(){
     }
     if(typeof data.idCounter === 'number') idCounter = data.idCounter;
     if(Array.isArray(data.outIds)) outIds = new Set(data.outIds.map(Number));
-    console.log('[Firebase] Remote update received — outIds:', [...outIds], '| roster size:', roster.length);
+    console.log('[Firebase] Remote update applied — outIds:', [...outIds], '| roster size:', roster.length);
     setSyncStatus('saved');
     renderEverything();
   }, (err) => {
@@ -1972,12 +1977,10 @@ clearRosterBtn.addEventListener('click', () => {
   try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
   renderEverything();
   if(window._firebaseDb){
-    setSyncStatus('syncing');
-    const { db, ref, set } = getFirebase();
     // Write a sentinel so all listeners know this is an intentional clear
-    set(ref(db, 'golfDraw'), { cleared: true, roster: [], idCounter: 0, outIds: [] })
-      .then(() => { setSyncStatus('saved'); _clearInProgress = false; })
-      .catch(() => { setSyncStatus('error'); _clearInProgress = false; });
+    _writeToFirebase({ cleared: true, roster: [], idCounter: 0, outIds: [] })
+      .then(() => { _clearInProgress = false; })
+      .catch(() => { _clearInProgress = false; });
   } else {
     _clearInProgress = false;
   }
@@ -2115,24 +2118,9 @@ rosterSearch.addEventListener('input', () => {
 
 markAllInBtn.addEventListener('click', () => {
   outIds.clear();
-  // Write immediately (bypassing debounce) so other devices receive the update without delay
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter, outIds: [] })); }catch(e){}
-  if(window._firebaseDb){
-    clearTimeout(_saveTimer);
-    _suppressRemoteUpdate = true;
-    setSyncStatus('syncing');
-    const { db, ref, set } = getFirebase();
-    set(ref(db, 'golfDraw'), { roster, idCounter, outIds: [] })
-      .then(() => {
-        setSyncStatus('saved');
-        setTimeout(() => { _suppressRemoteUpdate = false; }, 600);
-      })
-      .catch(err => {
-        console.warn('Firebase markAllIn save failed:', err);
-        setSyncStatus('error');
-        _suppressRemoteUpdate = false;
-      });
-  }
+  clearTimeout(_saveTimer); // cancel any pending debounced write
+  _writeToFirebase({ roster, idCounter, outIds: [] }); // write immediately, no debounce
   renderEverything();
 });
 markAllOutBtn.addEventListener('click', () => {
