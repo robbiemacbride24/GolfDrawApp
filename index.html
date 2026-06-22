@@ -1013,6 +1013,336 @@
   .final-groups-grid::-webkit-scrollbar-thumb{ background: rgba(201,162,75,0.5); border-radius: 4px; }
   .final-groups-grid::-webkit-scrollbar-track{ background: rgba(255,255,255,0.05); }
 
+
+  /* ============================= BOTTOM NAV ============================= */
+  .bottom-nav{
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 500;
+    background: rgba(8,42,32,0.96);
+    border-top: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    padding: 0 0 env(safe-area-inset-bottom);
+  }
+  .bottom-nav button{
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--cream-dim);
+    padding: 10px 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.2s ease;
+    cursor: pointer;
+  }
+  .bottom-nav button .nav-icon{ font-size: 20px; line-height: 1; }
+  .bottom-nav button.active{ color: var(--gold-bright); }
+  .bottom-nav button:active{ opacity: 0.7; }
+  body.light-mode .bottom-nav{ background: rgba(240,237,226,0.96); border-color: rgba(11,61,46,0.15); }
+  body.light-mode .bottom-nav button{ color: rgba(11,42,32,0.5); }
+  body.light-mode .bottom-nav button.active{ color: var(--fairway); }
+
+  /* page visibility */
+  .page{ display: none; }
+  .page.active-page{ display: block; }
+
+  /* ============================= UPCOMING OUTINGS ============================= */
+  .outing-card{
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    border-radius: var(--radius-md);
+    background: rgba(0,0,0,0.16);
+    border: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 10px;
+    transition: border-color 0.2s ease;
+  }
+  .outing-card.next-up{
+    border-color: var(--gold);
+    background: rgba(201,162,75,0.1);
+  }
+  .outing-card.past{
+    opacity: 0.45;
+    border-color: rgba(255,255,255,0.06);
+  }
+  .outing-date-block{
+    text-align: center;
+    min-width: 48px;
+    flex-shrink: 0;
+  }
+  .outing-date-day{
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--gold-bright);
+  }
+  .outing-card.past .outing-date-day{ color: var(--cream-dim); }
+  .outing-date-month{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--cream-dim);
+    margin-top: 2px;
+  }
+  .outing-info{ flex: 1; min-width: 0; }
+  .outing-name{
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--cream);
+    margin-bottom: 2px;
+  }
+  .outing-card.past .outing-name{ color: var(--cream-dim); }
+  .outing-venue{
+    font-size: 13px;
+    color: var(--cream-dim);
+  }
+  .outing-badge{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+  .badge-next{ background: rgba(201,162,75,0.2); border: 1px solid var(--gold); color: var(--gold-bright); }
+  .badge-upcoming{ background: rgba(127,209,168,0.1); border: 1px solid rgba(127,209,168,0.3); color: var(--buggy); }
+  .badge-past{ background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--cream-dim); }
+  .countdown-chip{
+    display: inline-block;
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--gold-bright);
+    font-weight: 600;
+  }
+  .outing-multi-day{ font-size: 12px; color: var(--cream-dim); margin-top: 2px; }
+
+  /* ============================= DRAW HISTORY ============================= */
+  .history-card{
+    border-radius: var(--radius-md);
+    background: rgba(0,0,0,0.16);
+    border: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .history-card-header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    cursor: pointer;
+    gap: 12px;
+    user-select: none;
+  }
+  .history-card-header:hover{ background: rgba(255,255,255,0.04); }
+  .history-card-title{
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--cream);
+  }
+  .history-card-meta{
+    font-size: 12.5px;
+    color: var(--cream-dim);
+    margin-top: 2px;
+    font-family: var(--font-mono);
+  }
+  .history-chevron{
+    font-size: 14px;
+    color: var(--cream-dim);
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+  }
+  .history-card.open .history-chevron{ transform: rotate(180deg); }
+  .history-card-body{
+    display: none;
+    padding: 0 18px 16px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .history-card.open .history-card-body{ display: block; }
+  .history-groups-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .history-group-card{
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+  }
+  .history-group-card h4{
+    font-family: var(--font-display);
+    font-size: 14px;
+    color: var(--gold-bright);
+    margin: 0 0 8px;
+  }
+  .history-group-card ul{ list-style: none; margin: 0; padding: 0; }
+  .history-group-card li{
+    font-size: 13.5px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    color: var(--cream);
+    font-weight: 500;
+  }
+  .history-group-card li:last-child{ border-bottom: none; }
+  .history-actions{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .history-actions .btn{ padding: 9px 16px; font-size: 13px; }
+  .empty-history{
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--cream-dim);
+    font-size: 14px;
+  }
+  .empty-history .pin{ font-size: 36px; display: block; margin-bottom: 10px; opacity: 0.5; }
+
+  /* ============================= SWAP MODAL ============================= */
+  .modal-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open{ display: flex; }
+  .modal-box{
+    background: #0E3D2C;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 85vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    animation: modalIn 0.25s cubic-bezier(.22,1,.36,1) both;
+  }
+  body.light-mode .modal-box{ background: #F0EDE0; border-color: rgba(11,61,46,0.2); }
+  @keyframes modalIn{ from{ opacity:0; transform: translateY(20px) scale(0.96); } to{ opacity:1; transform:none; } }
+  .modal-title{
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--cream);
+    margin: 0 0 6px;
+  }
+  body.light-mode .modal-title{ color: var(--fairway); }
+  .modal-sub{ font-size: 13px; color: var(--cream-dim); margin-bottom: 18px; line-height: 1.5; }
+  .modal-close{
+    float: right;
+    background: none;
+    border: none;
+    color: var(--cream-dim);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+    margin-top: -2px;
+  }
+  .swap-groups-wrap{ display: flex; flex-direction: column; gap: 12px; }
+  .swap-group-section{
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .swap-group-label{
+    background: rgba(201,162,75,0.15);
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gold-bright);
+    font-family: var(--font-mono);
+  }
+  .swap-player-btn{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 11px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    color: var(--cream);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    gap: 10px;
+    transition: background 0.15s ease;
+  }
+  .swap-player-btn:last-child{ border-bottom: none; }
+  .swap-player-btn:hover{ background: rgba(255,255,255,0.07); }
+  .swap-player-btn.selected{ background: rgba(201,162,75,0.2); color: var(--gold-bright); }
+  .swap-player-btn .swap-dot{
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    flex-shrink: 0;
+  }
+  .swap-player-btn.selected .swap-dot{
+    background: var(--gold-bright);
+    border-color: var(--gold-bright);
+  }
+  .swap-confirm-bar{
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .swap-status-msg{
+    font-size: 13px;
+    color: var(--cream-dim);
+    margin-top: 10px;
+    min-height: 20px;
+    font-style: italic;
+  }
+
+  /* ============================= SHARE TOAST ============================= */
+  .share-toast{
+    position: fixed;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(11,61,46,0.95);
+    border: 1px solid rgba(127,209,168,0.4);
+    color: var(--buggy);
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 900;
+    pointer-events: none;
+  }
+  .share-toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
   /* responsive tweaks */
   /* (legacy column-hiding rule removed — table layout has changed since;
      see .scorecard-table mobile rules further below for current behaviour) */
@@ -1020,9 +1350,38 @@
 </head>
 <body>
 
-<!-- =====================================================================
-     SETUP SCREEN (player input + group settings)
-===================================================================== -->
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="active" data-page="drawPage" id="navDraw">
+    <span class="nav-icon">🏌️</span>Draw
+  </button>
+  <button data-page="historyPage" id="navHistory">
+    <span class="nav-icon">📋</span>History
+  </button>
+  <button data-page="schedPage" id="navSched">
+    <span class="nav-icon">📅</span>Schedule
+  </button>
+</nav>
+
+<!-- SHARE TOAST -->
+<div class="share-toast" id="shareToast">✅ Copied to clipboard!</div>
+
+<!-- SWAP MODAL -->
+<div class="modal-overlay" id="swapModal">
+  <div class="modal-box">
+    <button class="modal-close" id="swapModalClose">✕</button>
+    <h2 class="modal-title">🔄 Swap Players</h2>
+    <p class="modal-sub">Pick one player from any group, then pick a second player to swap them with. Groups update instantly.</p>
+    <div class="swap-groups-wrap" id="swapGroupsWrap"></div>
+    <p class="swap-status-msg" id="swapStatusMsg">Tap a player to select them first.</p>
+    <div class="swap-confirm-bar">
+      <button class="btn btn-outline" id="swapCancelBtn" style="flex:1;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: DRAW (existing setup screen) -->
+<div class="page active-page" id="drawPage">
 <div class="app-shell" id="setupScreen">
 
   <div class="topbar">
@@ -1176,13 +1535,58 @@
       <div id="finalBuggyWarning"></div>
       <div class="final-groups-grid" id="finalGroupsGrid"></div>
       <div class="final-buttons">
-        <button class="btn btn-gold btn-lg" id="redrawBtn">🔀 Redraw Groups</button>
-        <button class="btn btn-outline btn-lg" id="backToSetupBtn">← Back to Setup</button>
+        <button class="btn btn-gold btn-lg" id="redrawBtn">🔀 Redraw</button>
+        <button class="btn btn-outline btn-lg" id="swapPlayersBtn">🔄 Swap Players</button>
+        <button class="btn btn-outline btn-lg" id="shareDrawBtn">📤 Share Draw</button>
+        <button class="btn btn-outline btn-lg" id="backToSetupBtn">← Back</button>
       </div>
     </div>
 
   </div>
 </div>
+</div><!-- /drawPage -->
+
+
+<!-- PAGE: HISTORY -->
+<div class="page" id="historyPage">
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-flag">⛳</span>
+        <div>
+          <p class="app-title">Lovey Golf <span class="accent">Section</span></p>
+          <p class="app-subtitle">Draw History</p>
+        </div>
+      </div>
+    </div>
+    <div class="glass panel">
+      <p class="eyebrow">Past draws</p>
+      <h2 class="panel-title">Draw History</h2>
+      <div id="historyListWrap"><div class="empty-history"><span class="pin">📋</span>No saved draws yet. Run your first draw to start the history.</div></div>
+    </div>
+  </div>
+</div><!-- /historyPage -->
+
+
+<!-- PAGE: SCHEDULE -->
+<div class="page" id="schedPage">
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-flag">⛳</span>
+        <div>
+          <p class="app-title">Lovey Golf <span class="accent">Section</span></p>
+          <p class="app-subtitle">2025 Schedule</p>
+        </div>
+      </div>
+    </div>
+    <div class="glass panel">
+      <p class="eyebrow">Remaining outings</p>
+      <h2 class="panel-title">Outing Schedule</h2>
+      <div id="scheduleWrap"></div>
+    </div>
+  </div>
+</div><!-- /schedPage -->
 
 
 <!-- Firebase SDK -->
@@ -1304,8 +1708,9 @@ function saveRosterToStorage(){
   if(_clearInProgress){ return; }    // don't let debounce overwrite a clear
 
   clearTimeout(_saveTimer);
+  _suppressRemoteUpdate = true; // block echo from Firebase listener while write is in flight
   _saveTimer = setTimeout(() => {
-    if(_clearInProgress){ return; }  // double-check before writing
+    if(_clearInProgress){ _suppressRemoteUpdate = false; return; }
     setSyncStatus('syncing');
     const { db, ref, set } = getFirebase();
     set(ref(db, 'golfDraw'), {
@@ -1314,9 +1719,13 @@ function saveRosterToStorage(){
       outIds: [...outIds]
     }).then(() => {
       setSyncStatus('saved');
+      // Small delay before re-enabling remote updates so the echo from our own
+      // write (which Firebase sends back) is ignored before other devices' changes come in
+      setTimeout(() => { _suppressRemoteUpdate = false; }, 600);
     }).catch(err => {
       console.warn('Firebase save failed:', err);
       setSyncStatus('error');
+      _suppressRemoteUpdate = false;
     });
   }, 400);
 }
@@ -1327,6 +1736,7 @@ function subscribeToFirebase(){
   const { db, ref, onValue } = getFirebase();
   setSyncStatus('syncing');
 
+  subscribeToHistory();
   onValue(ref(db, 'golfDraw'), (snapshot) => {
     if(_suppressRemoteUpdate) return;
     const data = snapshot.val();
@@ -1956,6 +2366,8 @@ function showStageScreen(screenEl){
   screenEl.classList.add('show');
 }
 
+let _isRedraw = false;
+
 function runDraw(){
   // compute groups fresh from today's active players
   const today = activePlayers();
@@ -2072,30 +2484,23 @@ function runStage3Reveal(){
 function runStage4Final(){
   showStageScreen(finalScreen);
 
-  const grid = $('#finalGroupsGrid');
   const summary = $('#finalGroupSummary');
   const buggyWarning = $('#finalBuggyWarning');
 
   const today = activePlayers();
   summary.textContent = `${today.length} players · ${currentGroups.length} groups`;
 
-  // only show this if two buggy pairs were genuinely forced into one group
-  // because there weren't enough groups to give each pair its own
   buggyWarning.innerHTML = lastDrawHadDoubledBuggyGroup
     ? `<div class="final-buggy-warning">⚠️ More buggy pairs than groups this time — one group has two buggy pairs in it, since pairs can't be split up.</div>`
     : '';
 
-  grid.innerHTML = currentGroups.map((group, i) => {
-    const items = group.map(p => {
-      const hcpText = formatHandicap(p.handicap);
-      return `<li>${p.buggy ? '🚗' : '⛳'} ${escapeHtml(p.name)}${hcpText !== null ? ` <span style="margin-left:auto; font-size:12.5px; color:var(--gold-bright); font-weight:700;">HCP ${hcpText}</span>` : ''}</li>`;
-    }).join('');
-    return `
-      <div class="final-group-card" style="animation-delay:${i * 0.08}s">
-        <h3>⛳ Group ${i + 1} <span style="font-size:12px; color:var(--cream-dim); font-weight:500;">(${group.length}-ball)</span></h3>
-        <ul>${items}</ul>
-      </div>`;
-  }).join('');
+  renderFinalGrid();
+
+  // Save to history only on the first draw, not on redraws
+  if(!_isRedraw){
+    saveDrawToHistory(currentGroups);
+  }
+  _isRedraw = false;
 
   launchConfetti();
 }
@@ -2132,6 +2537,7 @@ startDrawBtn.addEventListener('click', () => {
 });
 
 redrawBtn.addEventListener('click', () => {
+  _isRedraw = true;
   runDraw(); // re-compute a fresh random draw, then run the full animation sequence
 });
 
@@ -2169,10 +2575,307 @@ modeToggle.addEventListener('click', () => {
 });
 
 /* =====================================================================
+   BOTTOM NAV — page switching
+===================================================================== */
+const pages = { drawPage: $('#drawPage'), historyPage: $('#historyPage'), schedPage: $('#schedPage') };
+const navBtns = { drawPage: $('#navDraw'), historyPage: $('#navHistory'), schedPage: $('#navSched') };
+
+function switchPage(pageId){
+  Object.keys(pages).forEach(id => {
+    pages[id].classList.toggle('active-page', id === pageId);
+    navBtns[id].classList.toggle('active', id === pageId);
+  });
+  if(pageId === 'historyPage') renderHistory();
+  if(pageId === 'schedPage') renderSchedule();
+  window.scrollTo(0, 0);
+}
+
+$$('#bottomNav button').forEach(btn => {
+  btn.addEventListener('click', () => switchPage(btn.dataset.page));
+});
+
+/* =====================================================================
+   OUTING SCHEDULE
+===================================================================== */
+const OUTINGS = [
+  { name: 'Greenburn',  venue: 'Greenburn Golf Club',  date: new Date(2025, 5, 27) },  // June 27
+  { name: 'Deer Park',  venue: 'Deer Park Golf Club',  date: new Date(2025, 6, 11) },  // July 11
+  { name: 'Ballumbie',  venue: 'Ballumbie Castle',      date: new Date(2025, 7,  8) },  // Aug 8
+  { name: '🏆 Ryder Cup', venue: 'Drumoig Golf Centre', date: new Date(2025, 7, 28), endDate: new Date(2025, 7, 29) }, // Aug 28-29
+];
+
+function renderSchedule(){
+  const wrap = $('#scheduleWrap');
+  if(!wrap) return;
+  const now = new Date();
+  now.setHours(0,0,0,0);
+
+  const nextIdx = OUTINGS.findIndex(o => o.date >= now);
+
+  wrap.innerHTML = OUTINGS.map((o, i) => {
+    const isPast = o.date < now;
+    const isNext = i === nextIdx;
+
+    const day   = o.date.getDate();
+    const month = o.date.toLocaleString('en-GB', { month: 'short' }).toUpperCase();
+
+    let badge, badgeClass;
+    if(isPast){       badge = 'Played';   badgeClass = 'badge-past'; }
+    else if(isNext){  badge = 'Next up';  badgeClass = 'badge-next'; }
+    else {            badge = 'Upcoming'; badgeClass = 'badge-upcoming'; }
+
+    let countdown = '';
+    if(isNext){
+      const days = Math.round((o.date - now) / 86400000);
+      countdown = days === 0 ? '<span class="countdown-chip">🎉 Today!</span>'
+                : days === 1 ? '<span class="countdown-chip">⏰ Tomorrow!</span>'
+                : `<span class="countdown-chip">⏳ ${days} days to go</span>`;
+    }
+
+    const multiDay = o.endDate
+      ? `<div class="outing-multi-day">📅 ${o.date.getDate()} – ${o.endDate.getDate()} ${o.endDate.toLocaleString('en-GB',{month:'long'})} 2025</div>`
+      : '';
+
+    return `
+      <div class="outing-card ${isPast ? 'past' : ''} ${isNext ? 'next-up' : ''}">
+        <div class="outing-date-block">
+          <div class="outing-date-day">${day}</div>
+          <div class="outing-date-month">${month}</div>
+        </div>
+        <div class="outing-info">
+          <div class="outing-name">${o.name}</div>
+          <div class="outing-venue">${o.venue}</div>
+          ${multiDay}
+          ${countdown}
+        </div>
+        <span class="outing-badge ${badgeClass}">${badge}</span>
+      </div>`;
+  }).join('');
+}
+
+/* =====================================================================
+   DRAW HISTORY — save / load / render
+===================================================================== */
+let drawHistory = []; // [{ id, date, outingName, groups: [[{name,buggy,handicap},...]] }]
+
+function saveDrawToHistory(groups){
+  const entry = {
+    id: Date.now(),
+    date: new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }),
+    dateISO: new Date().toISOString(),
+    groups: groups.map(g => g.map(p => ({ name: p.name, buggy: p.buggy, handicap: p.handicap })))
+  };
+  drawHistory.unshift(entry); // newest first
+  if(drawHistory.length > 20) drawHistory = drawHistory.slice(0, 20); // cap at 20
+  persistHistory();
+  return entry;
+}
+
+function persistHistory(){
+  if(!window._firebaseDb) return;
+  const { db, ref, set } = getFirebase();
+  set(ref(db, 'golfDrawHistory'), drawHistory).catch(err => console.warn('History save failed:', err));
+}
+
+function subscribeToHistory(){
+  if(!window._firebaseDb) return;
+  const { db, ref, onValue } = getFirebase();
+  onValue(ref(db, 'golfDrawHistory'), (snap) => {
+    const data = snap.val();
+    if(Array.isArray(data)) drawHistory = data;
+    // re-render if history page is active
+    if($('#historyPage').classList.contains('active-page')) renderHistory();
+  }, () => {});
+}
+
+function renderHistory(){
+  const wrap = $('#historyListWrap');
+  if(!wrap) return;
+  if(drawHistory.length === 0){
+    wrap.innerHTML = '<div class="empty-history"><span class="pin">📋</span>No saved draws yet. Run your first draw to save it here.</div>';
+    return;
+  }
+  wrap.innerHTML = drawHistory.map((entry, idx) => {
+    const groupCards = entry.groups.map((g, gi) => {
+      const players = g.map(p => `<li>${p.buggy ? '🚗' : '⛳'} ${escapeHtml(p.name)}</li>`).join('');
+      return `<div class="history-group-card"><h4>Group ${gi+1} <span style="font-size:11px;font-weight:500;color:var(--cream-dim)">(${g.length}-ball)</span></h4><ul>${players}</ul></div>`;
+    }).join('');
+    return `
+      <div class="history-card" id="hcard-${entry.id}">
+        <div class="history-card-header" onclick="toggleHistoryCard('hcard-${entry.id}')">
+          <div>
+            <div class="history-card-title">📅 ${entry.date}</div>
+            <div class="history-card-meta">${entry.groups.length} groups · ${entry.groups.reduce((s,g)=>s+g.length,0)} players</div>
+          </div>
+          <span class="history-chevron">▼</span>
+        </div>
+        <div class="history-card-body">
+          <div class="history-groups-grid">${groupCards}</div>
+          <div class="history-actions">
+            <button class="btn btn-outline" onclick="shareHistoryEntry(${idx})">📤 Share</button>
+            <button class="btn btn-danger-ghost" onclick="deleteHistoryEntry(${idx})">🗑 Delete</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleHistoryCard(id){
+  const card = document.getElementById(id);
+  if(card) card.classList.toggle('open');
+}
+
+function deleteHistoryEntry(idx){
+  if(!confirm('Remove this draw from history?')) return;
+  drawHistory.splice(idx, 1);
+  persistHistory();
+  renderHistory();
+}
+
+function shareHistoryEntry(idx){
+  const entry = drawHistory[idx];
+  if(!entry) return;
+  shareText(buildShareText(entry.date, entry.groups));
+}
+
+function buildShareText(dateLabel, groups){
+  const header = `⛳ Lovey Golf Section Draw – ${dateLabel}\n${'─'.repeat(32)}`;
+  const body = groups.map((g, i) => {
+    const players = g.map(p => `  ${p.buggy ? '🚗' : '⛳'} ${p.name}`).join('\n');
+    return `\nGroup ${i+1} (${g.length}-ball):\n${players}`;
+  }).join('\n');
+  return header + body + '\n\n🏌️ Good luck lads!';
+}
+
+function shareText(text){
+  if(navigator.share){
+    navigator.share({ text }).catch(() => copyToClipboard(text));
+  } else {
+    copyToClipboard(text);
+  }
+}
+
+function copyToClipboard(text){
+  navigator.clipboard.writeText(text).then(() => showToast('✅ Copied to clipboard!')).catch(() => {
+    // fallback for older iOS
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try{ document.execCommand('copy'); showToast('✅ Copied to clipboard!'); }catch(e){ showToast('⚠️ Copy failed'); }
+    document.body.removeChild(ta);
+  });
+}
+
+function showToast(msg){
+  const t = $('#shareToast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* =====================================================================
+   SWAP PLAYERS
+===================================================================== */
+let swapSelected = null; // { groupIdx, playerIdx }
+
+function openSwapModal(){
+  swapSelected = null;
+  renderSwapModal();
+  $('#swapModal').classList.add('open');
+}
+
+function closeSwapModal(){
+  $('#swapModal').classList.remove('open');
+  swapSelected = null;
+}
+
+function renderSwapModal(){
+  const wrap = $('#swapGroupsWrap');
+  const msg  = $('#swapStatusMsg');
+  wrap.innerHTML = currentGroups.map((group, gi) => {
+    const players = group.map((p, pi) => {
+      const isSel = swapSelected && swapSelected.groupIdx === gi && swapSelected.playerIdx === pi;
+      return `<button class="swap-player-btn ${isSel ? 'selected' : ''}" onclick="handleSwapClick(${gi},${pi})">
+        <span class="swap-dot"></span>
+        ${p.buggy ? '🚗' : '⛳'} ${escapeHtml(p.name)}
+      </button>`;
+    }).join('');
+    return `<div class="swap-group-section">
+      <div class="swap-group-label">Group ${gi+1} · ${group.length}-ball</div>
+      ${players}
+    </div>`;
+  }).join('');
+  msg.textContent = swapSelected ? 'Now tap the player to swap with.' : 'Tap a player to select them first.';
+}
+
+function handleSwapClick(gi, pi){
+  if(!swapSelected){
+    swapSelected = { groupIdx: gi, playerIdx: pi };
+    renderSwapModal();
+    return;
+  }
+  // Same player tapped again — deselect
+  if(swapSelected.groupIdx === gi && swapSelected.playerIdx === pi){
+    swapSelected = null;
+    renderSwapModal();
+    return;
+  }
+  // Perform the swap
+  const a = currentGroups[swapSelected.groupIdx];
+  const b = currentGroups[gi];
+  const playerA = a[swapSelected.playerIdx];
+  const playerB = b[pi];
+  a[swapSelected.playerIdx] = playerB;
+  b[pi] = playerA;
+  swapSelected = null;
+
+  // Re-render the final screen grid without rerunning the animation
+  renderFinalGrid();
+  renderSwapModal();
+  $('#swapStatusMsg').textContent = `✅ Swapped ${escapeHtml(playerA.name)} and ${escapeHtml(playerB.name)}!`;
+}
+
+function renderFinalGrid(){
+  const grid = $('#finalGroupsGrid');
+  if(!grid) return;
+  grid.innerHTML = currentGroups.map((group, i) => {
+    const items = group.map(p => {
+      const hcpText = formatHandicap(p.handicap);
+      return `<li>${p.buggy ? '🚗' : '⛳'} ${escapeHtml(p.name)}${hcpText !== null ? ` <span style="margin-left:auto; font-size:12.5px; color:var(--gold-bright); font-weight:700;">HCP ${hcpText}</span>` : ''}</li>`;
+    }).join('');
+    return `<div class="final-group-card" style="animation-delay:${i * 0.08}s">
+      <h3>⛳ Group ${i+1} <span style="font-size:12px; color:var(--cream-dim); font-weight:500;">(${group.length}-ball)</span></h3>
+      <ul>${items}</ul>
+    </div>`;
+  }).join('');
+}
+
+$('#swapPlayersBtn').addEventListener('click', openSwapModal);
+$('#swapModalClose').addEventListener('click', closeSwapModal);
+$('#swapCancelBtn').addEventListener('click', closeSwapModal);
+$('#swapModal').addEventListener('click', (e) => { if(e.target === e.currentTarget) closeSwapModal(); });
+
+/* =====================================================================
+   SHARE CURRENT DRAW
+===================================================================== */
+$('#shareDrawBtn').addEventListener('click', () => {
+  const dateLabel = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+  shareText(buildShareText(dateLabel, currentGroups));
+});
+
+/* =====================================================================
+   SAVE DRAW TO HISTORY (hook into runStage4Final)
+===================================================================== */
+// Patched below — see modified runStage4Final
+
+/* =====================================================================
    INIT
 ===================================================================== */
 loadRosterFromStorage();
 renderEverything();
+renderSchedule();
 </script>
 
 </body>
