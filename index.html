@@ -1767,7 +1767,8 @@ function subscribeToFirebase(){
       }));
     }
     if(typeof data.idCounter === 'number') idCounter = data.idCounter;
-    if(Array.isArray(data.outIds)) outIds = new Set(data.outIds);
+    if(Array.isArray(data.outIds)) outIds = new Set(data.outIds.map(Number));
+    console.log('[Firebase] Remote update received — outIds:', [...outIds], '| roster size:', roster.length);
     setSyncStatus('saved');
     renderEverything();
   }, (err) => {
@@ -1792,7 +1793,7 @@ function migrateFromLocalStorage(){
         buggy: !!p.buggy
       }));
       if(typeof parsed.idCounter === 'number') idCounter = parsed.idCounter;
-      if(Array.isArray(parsed.outIds)) outIds = new Set(parsed.outIds);
+      if(Array.isArray(parsed.outIds)) outIds = new Set(parsed.outIds.map(Number));
       saveRosterToStorage(); // push to Firebase
       renderEverything();
     }
@@ -1813,7 +1814,7 @@ function loadRosterFromLocalStorage(){
       }));
     }
     if(typeof parsed.idCounter === 'number') idCounter = parsed.idCounter;
-    if(Array.isArray(parsed.outIds)) outIds = new Set(parsed.outIds);
+    if(Array.isArray(parsed.outIds)) outIds = new Set(parsed.outIds.map(Number));
   }catch(e){}
 }
 
