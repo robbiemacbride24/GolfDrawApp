@@ -1273,25 +1273,20 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-  // =====================================================================
-  // 🔧 FIREBASE CONFIG — paste your own config object here after creating
-  //    a free Firebase project at https://console.firebase.google.com
-  //    (Realtime Database, Spark/free plan)
-  // =====================================================================
   const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyDKFu03NVkUcSGSI_cV9SpYrpE3KvuhneI",
+    authDomain: "lovey-golf-draw.firebaseapp.com",
+    databaseURL: "https://lovey-golf-draw-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "lovey-golf-draw",
+    storageBucket: "lovey-golf-draw.firebasestorage.app",
+    messagingSenderId: "942946210085",
+    appId: "1:942946210085:web:50040052f62859a7aa0acc",
+    measurementId: "G-VCV5LR448E"
   };
 
   const app = initializeApp(firebaseConfig);
   const db  = getDatabase(app);
 
-  // Expose to the main script below via window
   window._firebaseDb  = db;
   window._firebaseRef = ref;
   window._firebaseSet = set;
