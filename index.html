@@ -1708,9 +1708,9 @@ function saveRosterToStorage(){
   if(_clearInProgress){ return; }    // don't let debounce overwrite a clear
 
   clearTimeout(_saveTimer);
-  _suppressRemoteUpdate = true; // block echo from Firebase listener while write is in flight
   _saveTimer = setTimeout(() => {
     if(_clearInProgress){ _suppressRemoteUpdate = false; return; }
+    _suppressRemoteUpdate = true; // block echo from Firebase listener while write is in flight
     setSyncStatus('syncing');
     const { db, ref, set } = getFirebase();
     set(ref(db, 'golfDraw'), {
@@ -2115,7 +2115,24 @@ rosterSearch.addEventListener('input', () => {
 
 markAllInBtn.addEventListener('click', () => {
   outIds.clear();
-  saveRosterToStorage();
+  // Write immediately (bypassing debounce) so other devices receive the update without delay
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter, outIds: [] })); }catch(e){}
+  if(window._firebaseDb){
+    clearTimeout(_saveTimer);
+    _suppressRemoteUpdate = true;
+    setSyncStatus('syncing');
+    const { db, ref, set } = getFirebase();
+    set(ref(db, 'golfDraw'), { roster, idCounter, outIds: [] })
+      .then(() => {
+        setSyncStatus('saved');
+        setTimeout(() => { _suppressRemoteUpdate = false; }, 600);
+      })
+      .catch(err => {
+        console.warn('Firebase markAllIn save failed:', err);
+        setSyncStatus('error');
+        _suppressRemoteUpdate = false;
+      });
+  }
   renderEverything();
 });
 markAllOutBtn.addEventListener('click', () => {
