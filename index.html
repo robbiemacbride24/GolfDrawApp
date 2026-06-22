@@ -689,6 +689,24 @@
     color: var(--buggy);
   }
 
+  /* ============================= SYNC STATUS ============================= */
+  .sync-status{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.15);
+    white-space: nowrap;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  .sync-syncing{ background: rgba(201,162,75,0.12); color: var(--gold-bright); border-color: rgba(201,162,75,0.3); }
+  .sync-saved{   background: rgba(127,209,168,0.12); color: var(--buggy);      border-color: rgba(127,209,168,0.3); }
+  .sync-error{   background: rgba(217,105,79,0.12);  color: #F0A48F;           border-color: rgba(217,105,79,0.3); }
+  .sync-offline{ background: rgba(255,255,255,0.06); color: var(--cream-dim);  border-color: rgba(255,255,255,0.12); }
+  body.light-mode .sync-status{ border-color: rgba(11,61,46,0.2); }
+  body.light-mode .sync-saved{ background: rgba(11,61,46,0.08); color: var(--fairway); }
+
   /* ============================= FOOTER NOTE ============================= */
   .footer-note{
     text-align:center;
@@ -1074,6 +1092,7 @@
       </div>
     </div>
     <div class="topbar-controls">
+      <span id="syncStatus" class="sync-status sync-syncing">⏳ Syncing…</span>
       <button class="mode-toggle" id="modeToggle" aria-label="Toggle dark mode" title="Toggle dark/light mode">
         <span class="knob">🌙</span>
       </button>
@@ -1194,7 +1213,7 @@
     </div>
   </div>
 
-  <p class="footer-note">Lovey Golf Section · Outing Draw Tool · Built for the big screen 🍻</p>
+  <p class="footer-note">Lovey Golf Section · Outing Draw Tool · Live sync powered by Firebase ☁️</p>
 </div>
 
 
@@ -1249,18 +1268,48 @@
 </div>
 
 
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // =====================================================================
+  // 🔧 FIREBASE CONFIG — paste your own config object here after creating
+  //    a free Firebase project at https://console.firebase.google.com
+  //    (Realtime Database, Spark/free plan)
+  // =====================================================================
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // Expose to the main script below via window
+  window._firebaseDb  = db;
+  window._firebaseRef = ref;
+  window._firebaseSet = set;
+  window._firebaseOnValue = onValue;
+</script>
+
 <script>
 /* =====================================================================
    STATE
    - roster: the permanent saved list of everyone in the section.
             { id, name, handicap (number|null), buggy (bool) }
-            Persisted to localStorage so it survives between visits.
-   - outBySession: a Set of roster ids marked "not coming" for THIS outing.
+            Synced to Firebase Realtime Database (shared across all users).
+   - outIds:  a Set of roster ids marked "not coming" for THIS outing.
             Reset each time you reset the outing, but the roster itself
             is untouched.
-   - players: derived at draw time = roster minus anyone in outBySession.
+   - players: derived at draw time = roster minus anyone in outIds.
 ===================================================================== */
-const STORAGE_KEY = 'loveyGolfRoster_v1';
+const STORAGE_KEY = 'loveyGolfRoster_v1'; // kept for migration fallback
 
 let roster = [];           // { id, name, handicap, buggy } — saved permanently
 let outIds = new Set();    // roster ids marked out for this outing
@@ -1308,33 +1357,149 @@ const redrawBtn      = $('#redrawBtn');
 const backToSetupBtn = $('#backToSetupBtn');
 
 /* =====================================================================
-   PERSISTENCE (localStorage — saved roster lives on this device)
+   FIREBASE SYNC — shared real-time data for all users
 ===================================================================== */
-function saveRosterToStorage(){
-  try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter }));
-  }catch(e){
-    console.warn('Could not save roster to this device:', e);
-  }
+
+// Sync status indicator
+function setSyncStatus(state){ // 'syncing' | 'saved' | 'error' | 'offline'
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  const icons = { syncing:'⏳', saved:'☁️ ✓', error:'⚠️', offline:'📴' };
+  const labels = { syncing:'Syncing…', saved:'Synced', error:'Sync error', offline:'Offline' };
+  el.textContent = `${icons[state]} ${labels[state]}`;
+  el.className = `sync-status sync-${state}`;
 }
 
-function loadRosterFromStorage(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return;
-    const parsed = JSON.parse(raw);
-    if(Array.isArray(parsed.roster)){
-      roster = parsed.roster.map(p => ({
+let _fbReady = false; // true once Firebase module is loaded
+let _suppressRemoteUpdate = false; // prevent echo loop when we write
+
+function getFirebase(){
+  return {
+    db: window._firebaseDb,
+    ref: window._firebaseRef,
+    set: window._firebaseSet,
+    onValue: window._firebaseOnValue
+  };
+}
+
+// Save roster + outIds to Firebase (debounced)
+let _saveTimer = null;
+function saveRosterToStorage(){
+  // Always keep a local backup too
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter, outIds: [...outIds] })); }catch(e){}
+
+  if(!window._firebaseDb){ return; } // Firebase not loaded yet
+
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    setSyncStatus('syncing');
+    const { db, ref, set } = getFirebase();
+    set(ref(db, 'golfDraw'), {
+      roster,
+      idCounter,
+      outIds: [...outIds]
+    }).then(() => {
+      setSyncStatus('saved');
+    }).catch(err => {
+      console.warn('Firebase save failed:', err);
+      setSyncStatus('error');
+    });
+  }, 400);
+}
+
+// Listen for remote changes from other users and apply them
+function subscribeToFirebase(){
+  if(!window._firebaseDb) return;
+  const { db, ref, onValue } = getFirebase();
+  setSyncStatus('syncing');
+
+  onValue(ref(db, 'golfDraw'), (snapshot) => {
+    if(_suppressRemoteUpdate) return;
+    const data = snapshot.val();
+    if(!data) {
+      // Nothing in Firebase yet — try to migrate from localStorage
+      migrateFromLocalStorage();
+      setSyncStatus('saved');
+      return;
+    }
+    // Apply remote state
+    if(Array.isArray(data.roster)){
+      roster = data.roster.map(p => ({
         id: p.id,
         name: p.name,
         handicap: (p.handicap === null || p.handicap === undefined || p.handicap === '') ? null : Number(p.handicap),
         buggy: !!p.buggy
       }));
     }
+    if(typeof data.idCounter === 'number') idCounter = data.idCounter;
+    if(Array.isArray(data.outIds)) outIds = new Set(data.outIds);
+    setSyncStatus('saved');
+    renderEverything();
+  }, (err) => {
+    console.warn('Firebase listen error:', err);
+    setSyncStatus('error');
+    // Fall back to localStorage if Firebase fails
+    loadRosterFromLocalStorage();
+    renderEverything();
+  });
+}
+
+// One-time migration: push existing localStorage data up to Firebase
+function migrateFromLocalStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(Array.isArray(parsed.roster) && parsed.roster.length > 0){
+      roster = parsed.roster.map(p => ({
+        id: p.id, name: p.name,
+        handicap: (p.handicap === null || p.handicap === undefined) ? null : Number(p.handicap),
+        buggy: !!p.buggy
+      }));
+      if(typeof parsed.idCounter === 'number') idCounter = parsed.idCounter;
+      if(Array.isArray(parsed.outIds)) outIds = new Set(parsed.outIds);
+      saveRosterToStorage(); // push to Firebase
+      renderEverything();
+    }
+  }catch(e){}
+}
+
+// Fallback: load from localStorage only (used when Firebase unavailable)
+function loadRosterFromLocalStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(Array.isArray(parsed.roster)){
+      roster = parsed.roster.map(p => ({
+        id: p.id, name: p.name,
+        handicap: (p.handicap === null || p.handicap === undefined || p.handicap === '') ? null : Number(p.handicap),
+        buggy: !!p.buggy
+      }));
+    }
     if(typeof parsed.idCounter === 'number') idCounter = parsed.idCounter;
-  }catch(e){
-    console.warn('Could not load saved roster:', e);
-  }
+    if(Array.isArray(parsed.outIds)) outIds = new Set(parsed.outIds);
+  }catch(e){}
+}
+
+// Called at init — wait for Firebase module then subscribe
+function loadRosterFromStorage(){
+  // Attempt to load locally while Firebase connects, for instant render
+  loadRosterFromLocalStorage();
+
+  // Poll until the Firebase module has been imported by the ES module block above
+  let attempts = 0;
+  const poll = setInterval(() => {
+    attempts++;
+    if(window._firebaseDb){
+      clearInterval(poll);
+      subscribeToFirebase();
+    } else if(attempts > 40){ // 4 seconds — give up, use local only
+      clearInterval(poll);
+      setSyncStatus('offline');
+      renderEverything();
+    }
+  }, 100);
 }
 
 /* =====================================================================
