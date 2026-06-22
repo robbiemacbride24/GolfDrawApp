@@ -1625,7 +1625,16 @@ clearRosterBtn.addEventListener('click', () => {
   if(!confirmed) return;
   roster = [];
   outIds.clear();
-  saveRosterToStorage();
+  idCounter = 0;
+  // Write the cleared state explicitly so all devices update
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  if(window._firebaseDb){
+    setSyncStatus('syncing');
+    const { db, ref, set } = getFirebase();
+    set(ref(db, 'golfDraw'), { roster: [], idCounter: 0, outIds: [] })
+      .then(() => setSyncStatus('saved'))
+      .catch(() => setSyncStatus('error'));
+  }
   renderEverything();
 });
 
