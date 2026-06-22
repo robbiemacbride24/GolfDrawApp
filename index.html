@@ -607,65 +607,6 @@
   .roster-search::placeholder{ color: rgba(243,239,227,0.4); }
   body.light-mode .roster-search::placeholder{ color: rgba(11,42,32,0.4); }
 
-  /* ============================= GROUP MODE SELECTOR ============================= */
-  .mode-selector{
-    display:grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-top: 8px;
-  }
-  @media (max-width: 640px){ .mode-selector{ grid-template-columns: 1fr; } }
-
-  .mode-card{
-    background: rgba(0,0,0,0.16);
-    border: 1.5px solid rgba(255,255,255,0.14);
-    border-radius: var(--radius-md);
-    padding: 16px 18px;
-    cursor: pointer;
-    transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
-    position: relative;
-  }
-  body.light-mode .mode-card{ background: rgba(255,255,255,0.5); border-color: rgba(11,61,46,0.16); }
-  .mode-card:hover{ transform: translateY(-2px); }
-  .mode-card.selected{
-    border-color: var(--gold);
-    background: rgba(201,162,75,0.14);
-  }
-  .mode-card-title{
-    font-weight: 700;
-    font-size: 15px;
-    display:flex;
-    align-items:center;
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-  .mode-card-desc{ font-size: 12.5px; color: var(--cream-dim); line-height:1.4; }
-  body.light-mode .mode-card-desc{ color: rgba(11,42,32,0.65); }
-  .mode-card .check-dot{
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.3);
-    display:inline-block;
-    position: absolute;
-    top: 14px; right: 14px;
-  }
-  .mode-card.selected .check-dot{
-    border-color: var(--gold);
-    background: var(--gold);
-    box-shadow: 0 0 0 3px rgba(201,162,75,0.2);
-  }
-
-  .recommended-tag{
-    font-size: 9.5px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    background: var(--gold);
-    color: var(--ink);
-    padding: 2px 7px;
-    border-radius: 5px;
-    font-weight: 800;
-    margin-left: 6px;
-  }
 
   /* ============================= VALIDATION / NOTICE ============================= */
   .notice{
@@ -1177,36 +1118,11 @@
     <div id="drawListWrap"></div>
   </div>
 
-  <!-- GROUP SETTINGS PANEL -->
-  <div class="glass panel">
-    <p class="eyebrow">Step 4</p>
-    <h2 class="panel-title">Group format</h2>
-
-    <div class="mode-selector" id="modeSelector">
-      <div class="mode-card selected" data-mode="auto">
-        <span class="check-dot"></span>
-        <div class="mode-card-title">⚙️ Automatic <span class="recommended-tag">Recommended</span></div>
-        <div class="mode-card-desc">Best mix of 3 &amp; 4-balls for the headcount. Avoids 5-balls where possible.</div>
-      </div>
-      <div class="mode-card" data-mode="three">
-        <span class="check-dot"></span>
-        <div class="mode-card-title">3️⃣ Prefer 3-balls</div>
-        <div class="mode-card-desc">Fills groups of 3 first, leaving a smaller final group if needed.</div>
-      </div>
-      <div class="mode-card" data-mode="four">
-        <span class="check-dot"></span>
-        <div class="mode-card-title">4️⃣ Prefer 4-balls</div>
-        <div class="mode-card-desc">Fills groups of 4 first, leaving a smaller final group if needed.</div>
-      </div>
-    </div>
-
-    <div id="groupPreviewNotice"></div>
-  </div>
-
   <!-- ACTIONS -->
   <div class="glass panel">
-    <p class="eyebrow">Step 5</p>
+    <p class="eyebrow">Step 4</p>
     <h2 class="panel-title">Run the draw</h2>
+    <div id="groupPreviewNotice"></div>
     <button class="btn btn-gold btn-lg btn-block" id="startDrawBtn">🏌️ Start Draw</button>
     <div class="row-buttons">
       <button class="btn btn-outline" id="resetBtn" style="flex:1;">↺ Reset outing (keep saved roster)</button>
@@ -1308,7 +1224,6 @@ const STORAGE_KEY = 'loveyGolfRoster_v1'; // kept for migration fallback
 
 let roster = [];           // { id, name, handicap, buggy } — saved permanently
 let outIds = new Set();    // roster ids marked out for this outing
-let groupMode = 'auto';    // 'auto' | 'three' | 'four'
 let currentGroups = [];    // array of arrays of player objects, computed on draw
 let idCounter = 0;
 let rosterSearchTerm = '';
@@ -1337,7 +1252,6 @@ const clearRosterBtn    = $('#clearRosterBtn');
 
 const validationNotice   = $('#validationNotice');
 const groupPreviewNotice = $('#groupPreviewNotice');
-const modeSelector       = $('#modeSelector');
 const startDrawBtn       = $('#startDrawBtn');
 const resetBtn           = $('#resetBtn');
 const modeToggle         = $('#modeToggle');
@@ -1773,6 +1687,7 @@ function renderAvailabilityList(){
       const id = Number(btn.dataset.id);
       if(outIds.has(id)) outIds.delete(id);
       else outIds.add(id);
+      saveRosterToStorage();
       renderEverything();
     });
   });
@@ -1788,10 +1703,12 @@ rosterSearch.addEventListener('input', () => {
 
 markAllInBtn.addEventListener('click', () => {
   outIds.clear();
+  saveRosterToStorage();
   renderEverything();
 });
 markAllOutBtn.addEventListener('click', () => {
   roster.forEach(p => outIds.add(p.id));
+  saveRosterToStorage();
   renderEverything();
 });
 
@@ -1843,60 +1760,12 @@ function renderEverything(){
 }
 
 /* =====================================================================
-   GROUP MODE SELECTION
-===================================================================== */
-modeSelector.addEventListener('click', (e) => {
-  const card = e.target.closest('.mode-card');
-  if(!card) return;
-  $$('.mode-card').forEach(c => c.classList.remove('selected'));
-  card.classList.add('selected');
-  groupMode = card.dataset.mode;
-  updateGroupPreview();
-});
-
-/* =====================================================================
    GROUP SIZE PLANNING
    Returns an array of integers representing group sizes, e.g. [4,4,4]
 ===================================================================== */
-function planGroupSizes(totalPlayers, mode){
+function planGroupSizes(totalPlayers){
   if(totalPlayers === 0) return [];
-
-  if(mode === 'three'){
-    return planPreferSize(totalPlayers, 3);
-  }
-  if(mode === 'four'){
-    return planPreferSize(totalPlayers, 4);
-  }
-  // AUTOMATIC: choose the best mix of 4s and 3s, avoiding 5-balls unless unavoidable
   return planAutomatic(totalPlayers);
-}
-
-// Build sizes preferring a target size (3 or 4), last group absorbs remainder,
-// avoiding groups smaller than 2 by borrowing from the previous group.
-function planPreferSize(total, target){
-  if(total <= 0) return [];
-  if(total <= target + 1 && total >= 2){
-    // small total — just one group (covers e.g. 5 players preferring 4s -> one 5-ball)
-    return [total];
-  }
-  if(total < 2) return [total]; // single straggler, nothing we can do
-
-  let sizes = [];
-  let remaining = total;
-  while(remaining > 0){
-    if(remaining === target){ sizes.push(target); remaining = 0; }
-    else if(remaining > target){ sizes.push(target); remaining -= target; }
-    else { // remaining < target and > 0 -> remainder group
-      sizes.push(remaining);
-      remaining = 0;
-    }
-  }
-  // fix a trailing group of 1 by borrowing one player from the previous group
-  if(sizes.length > 1 && sizes[sizes.length - 1] === 1){
-    sizes[sizes.length - 1] = 2;
-    sizes[sizes.length - 2] -= 1;
-  }
-  return sizes;
 }
 
 // Automatic: prefer a clean mix of 4-balls and 3-balls, avoid 5-balls unless necessary.
@@ -1930,7 +1799,7 @@ function planAutomatic(total){
   if(total === 1) return [1];
 
   // Fallback safety net (shouldn't be reached for total >= 6)
-  return planPreferSize(total, 4);
+  return [total];
 }
 
 function sortGroupSizesNicely(sizes){
@@ -1946,7 +1815,7 @@ function updateGroupPreview(){
     startDrawBtn.disabled = true;
     return;
   }
-  const sizes = planGroupSizes(total, groupMode);
+  const sizes = planGroupSizes(total, 'auto');
   const summary = sizes.map(s => `${s}-ball`).join(' + ');
   const hasFive = sizes.includes(5);
 
@@ -2089,7 +1958,7 @@ function showStageScreen(screenEl){
 function runDraw(){
   // compute groups fresh from today's active players
   const today = activePlayers();
-  const sizes = planGroupSizes(today.length, groupMode);
+  const sizes = planGroupSizes(today.length, 'auto');
   currentGroups = formGroups(today, sizes);
 
   drawStage.classList.add('active');
@@ -2283,11 +2152,9 @@ resetBtn.addEventListener('click', () => {
   const confirmed = confirm('This clears who\'s marked In/Out for today and resets the group format. Your saved roster of names stays put. Continue?');
   if(!confirmed) return;
   outIds.clear();
-  groupMode = 'auto';
-  $$('.mode-card').forEach(c => c.classList.remove('selected'));
-  $('.mode-card[data-mode="auto"]').classList.add('selected');
   currentGroups = [];
   validationNotice.innerHTML = '';
+  saveRosterToStorage();
   renderEverything();
 });
 
