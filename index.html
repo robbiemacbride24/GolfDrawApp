@@ -1536,7 +1536,7 @@
       <div class="final-groups-grid" id="finalGroupsGrid"></div>
       <div class="final-buttons">
         <button class="btn btn-gold btn-lg" id="redrawBtn">🔀 Redraw</button>
-        <button class="btn btn-outline btn-lg" id="swapPlayersBtn">🔄 Swap Players</button>
+        <button class="btn btn-outline btn-lg" id="swapPlayersBtn" style="display:none;">🔄 Swap Players</button>
         <button class="btn btn-outline btn-lg" id="shareDrawBtn">📤 Share Draw</button>
         <button class="btn btn-outline btn-lg" id="backToSetupBtn">← Back</button>
       </div>
@@ -2368,6 +2368,7 @@ function showStageScreen(screenEl){
 }
 
 let _isRedraw = false;
+let _currentHistoryId = null; // tracks the history entry for the current draw session
 
 function runDraw(){
   // compute groups fresh from today's active players
@@ -2497,9 +2498,11 @@ function runStage4Final(){
 
   renderFinalGrid();
 
-  // Save to history only on the first draw, not on redraws
+  // Save to history: on first draw add a new entry; on redraw update the existing one
   if(!_isRedraw){
-    saveDrawToHistory(currentGroups);
+    _currentHistoryId = saveDrawToHistory(currentGroups).id;
+  } else {
+    updateDrawInHistory(_currentHistoryId, currentGroups);
   }
   _isRedraw = false;
 
@@ -2672,6 +2675,17 @@ function saveDrawToHistory(groups){
   return entry;
 }
 
+function updateDrawInHistory(id, groups){
+  const idx = drawHistory.findIndex(e => e.id === id);
+  if(idx === -1){ // entry not found — just save as new
+    const entry = saveDrawToHistory(groups);
+    _currentHistoryId = entry.id;
+    return;
+  }
+  drawHistory[idx].groups = groups.map(g => g.map(p => ({ name: p.name, buggy: p.buggy, handicap: p.handicap })));
+  persistHistory();
+}
+
 function persistHistory(){
   if(!window._firebaseDb) return;
   const { db, ref, set } = getFirebase();
@@ -2713,6 +2727,7 @@ function renderHistory(){
         <div class="history-card-body">
           <div class="history-groups-grid">${groupCards}</div>
           <div class="history-actions">
+            <button class="btn btn-outline" onclick="openHistorySwapModal(${idx})">🔄 Swap Players</button>
             <button class="btn btn-outline" onclick="shareHistoryEntry(${idx})">📤 Share</button>
             <button class="btn btn-danger-ghost" onclick="deleteHistoryEntry(${idx})">🗑 Delete</button>
           </div>
@@ -2724,6 +2739,82 @@ function renderHistory(){
 function toggleHistoryCard(id){
   const card = document.getElementById(id);
   if(card) card.classList.toggle('open');
+}
+
+// History swap — lets you swap players within a saved history entry
+let _historySwapIdx = null; // which drawHistory entry we're editing
+let _historySwapGroups = null; // working copy of that entry's groups
+
+function openHistorySwapModal(idx){
+  const entry = drawHistory[idx];
+  if(!entry) return;
+  _historySwapIdx = idx;
+  // Deep-copy so we can cancel without side effects
+  _historySwapGroups = entry.groups.map(g => g.map(p => ({ ...p })));
+  swapSelected = null;
+  renderHistorySwapModal();
+  $('#swapModal').classList.add('open');
+}
+
+function renderHistorySwapModal(){
+  const wrap = $('#swapGroupsWrap');
+  const msg  = $('#swapStatusMsg');
+  wrap.innerHTML = _historySwapGroups.map((group, gi) => {
+    const players = group.map((p, pi) => {
+      const isSel = swapSelected && swapSelected.groupIdx === gi && swapSelected.playerIdx === pi;
+      return `<button class="swap-player-btn ${isSel ? 'selected' : ''}" onclick="handleHistorySwapClick(${gi},${pi})">
+        <span class="swap-dot"></span>
+        ${p.buggy ? '🚗' : '⛳'} ${escapeHtml(p.name)}
+      </button>`;
+    }).join('');
+    return `<div class="swap-group-section">
+      <div class="swap-group-label">Group ${gi+1} · ${group.length}-ball</div>
+      ${players}
+    </div>`;
+  }).join('');
+  msg.textContent = swapSelected ? 'Now tap the player to swap with.' : 'Tap a player to select them first.';
+  // Show a save button in the modal footer
+  let saveBtn = document.getElementById('historySwapSaveBtn');
+  if(!saveBtn){
+    const footer = $('#swapModal .modal-footer') || $('#swapCancelBtn').parentElement;
+    saveBtn = document.createElement('button');
+    saveBtn.id = 'historySwapSaveBtn';
+    saveBtn.className = 'btn btn-gold';
+    saveBtn.textContent = '💾 Save changes';
+    saveBtn.onclick = saveHistorySwap;
+    footer.insertBefore(saveBtn, $('#swapCancelBtn'));
+  }
+}
+
+function handleHistorySwapClick(gi, pi){
+  if(!swapSelected){
+    swapSelected = { groupIdx: gi, playerIdx: pi };
+    renderHistorySwapModal();
+    return;
+  }
+  if(swapSelected.groupIdx === gi && swapSelected.playerIdx === pi){
+    swapSelected = null;
+    renderHistorySwapModal();
+    return;
+  }
+  const a = _historySwapGroups[swapSelected.groupIdx];
+  const b = _historySwapGroups[gi];
+  const playerA = a[swapSelected.playerIdx];
+  const playerB = b[pi];
+  a[swapSelected.playerIdx] = playerB;
+  b[pi] = playerA;
+  swapSelected = null;
+  renderHistorySwapModal();
+  $('#swapStatusMsg').textContent = `✅ Swapped ${escapeHtml(playerA.name)} and ${escapeHtml(playerB.name)}!`;
+}
+
+function saveHistorySwap(){
+  if(_historySwapIdx === null) return;
+  drawHistory[_historySwapIdx].groups = _historySwapGroups;
+  persistHistory();
+  closeSwapModal();
+  renderHistory();
+  showToast('✅ Draw updated!');
 }
 
 function deleteHistoryEntry(idx){
@@ -2790,6 +2881,11 @@ function openSwapModal(){
 function closeSwapModal(){
   $('#swapModal').classList.remove('open');
   swapSelected = null;
+  _historySwapIdx = null;
+  _historySwapGroups = null;
+  // Remove history-specific save button if present
+  const saveBtn = document.getElementById('historySwapSaveBtn');
+  if(saveBtn) saveBtn.remove();
 }
 
 function renderSwapModal(){
