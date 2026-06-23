@@ -2309,51 +2309,59 @@ function formGroups(playerList, sizes){
   const buggyPlayers    = shuffleArray(playerList.filter(p => p.buggy));
   const nonBuggyPlayers = shuffleArray(playerList.filter(p => !p.buggy));
 
-  // build buggy units (pairs, plus a possible solo leftover)
-  let pairUnits = [];
-  let soloBuggyUnits = [];
+  // Build buggy units: always pairs of 2 (atomic — never split).
+  // If odd number of buggy players, the last one is a solo unit.
+  let buggyUnits = [];
   for(let i = 0; i < buggyPlayers.length; i += 2){
     if(i + 1 < buggyPlayers.length){
-      pairUnits.push({ players: [buggyPlayers[i], buggyPlayers[i+1]], isBuggyPair: true, size: 2 });
+      buggyUnits.push({ players: [buggyPlayers[i], buggyPlayers[i+1]], size: 2 });
     } else {
-      soloBuggyUnits.push({ players: [buggyPlayers[i]], isBuggyPair: false, size: 1 }); // odd one out, solo
+      buggyUnits.push({ players: [buggyPlayers[i]], size: 1 }); // odd one out
     }
   }
-  pairUnits = shuffleArray(pairUnits);
+  buggyUnits = shuffleArray(buggyUnits);
 
-  // non-buggy players are single-player units
-  let nonBuggyUnits = shuffleArray(nonBuggyPlayers.map(p => ({ players: [p], isBuggyPair: false, size: 1 })));
+  // Non-buggy players as single units
+  let nonBuggyUnits = shuffleArray(nonBuggyPlayers.map(p => ({ players: [p], size: 1 })));
 
-  // prepare empty groups according to planned sizes (order randomized so
-  // "Group 1" isn't predictably the biggest group every time)
+  // Prepare empty groups. Track buggyCount so we can enforce the max-2 rule.
   const groupTargets = [...sizes].sort((a, b) => a - b);
-  const groups = groupTargets.map(size => ({ target: size, players: [], hasBuggyPair: false }));
+  const groups = groupTargets.map(size => ({ target: size, players: [], buggyCount: 0 }));
 
-  // ---- PASS 1: place buggy PAIRS first, one per group, never doubling up
-  //      unless there is truly no group left without a pair already in it.
-  const unplacedPairs = [];
-  pairUnits.forEach(unit => {
-    // groups with room AND no buggy pair yet
-    let candidates = groups.filter(g => g.players.length + unit.size <= g.target && !g.hasBuggyPair);
+  // ---- PASS 1: place buggy units one at a time.
+  //   Priority order for candidate groups:
+  //     1. Has room AND buggyCount === 0   (ideal: own group)
+  //     2. Has room AND buggyCount + unit.size <= 2  (acceptable: max 2 buggies per group)
+  //     3. Has room (last resort — only if no group can keep under the cap)
+  const unplaced = [];
+  buggyUnits.forEach(unit => {
+    // Prefer a group with no buggies yet
+    let candidates = groups.filter(g =>
+      g.players.length + unit.size <= g.target && g.buggyCount === 0
+    );
     if(candidates.length === 0){
-      // no pair-free group has room — fall back to ANY group with room,
-      // even if it already has a pair (this is the doubling-up we want to avoid)
+      // Accept any group where adding this unit keeps buggy count <= 2
+      candidates = groups.filter(g =>
+        g.players.length + unit.size <= g.target && g.buggyCount + unit.size <= 2
+      );
+    }
+    if(candidates.length === 0){
+      // Absolute last resort: any group with physical room (may exceed cap)
       candidates = groups.filter(g => g.players.length + unit.size <= g.target);
     }
     if(candidates.length > 0){
       const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-      if(chosen.hasBuggyPair) lastDrawHadDoubledBuggyGroup = true;
+      if(chosen.buggyCount + unit.size > 2) lastDrawHadDoubledBuggyGroup = true;
       chosen.players.push(...unit.players);
-      chosen.hasBuggyPair = true;
+      chosen.buggyCount += unit.size;
     } else {
-      unplacedPairs.push(unit); // no room anywhere yet — handle in leftover pass
+      unplaced.push(unit);
     }
   });
 
-  // ---- PASS 2: place solo buggy units and non-buggy units into remaining space
-  const remainingUnits = shuffleArray([...soloBuggyUnits, ...nonBuggyUnits]);
+  // ---- PASS 2: fill remaining space with non-buggy players
   const leftovers = [];
-  remainingUnits.forEach(unit => {
+  nonBuggyUnits.forEach(unit => {
     const candidates = groups.filter(g => g.players.length + unit.size <= g.target);
     if(candidates.length > 0){
       const chosen = candidates[Math.floor(Math.random() * candidates.length)];
@@ -2363,19 +2371,15 @@ function formGroups(playerList, sizes){
     }
   });
 
-  // ---- PASS 3: place any unplaced buggy pairs (capacity was full in pass 1)
-  //      plus any other leftovers, into whichever group has the most free
-  //      room — this never splits a pair, but may force two pairs into one
-  //      group if there simply aren't enough groups to go around.
-  [...unplacedPairs, ...leftovers].forEach(unit => {
+  // ---- PASS 3: force-place anything still unplaced into the group with most free room
+  [...unplaced, ...leftovers].forEach(unit => {
     groups.sort((a, b) => (a.target - a.players.length) - (b.target - b.players.length));
-    const target = groups[groups.length - 1]; // most free room
-    if(unit.isBuggyPair && target.hasBuggyPair) lastDrawHadDoubledBuggyGroup = true;
+    const target = groups[groups.length - 1];
+    if(unit.players.some(p => p.buggy) && target.buggyCount + unit.size > 2) lastDrawHadDoubledBuggyGroup = true;
     target.players.push(...unit.players);
-    if(unit.isBuggyPair) target.hasBuggyPair = true;
+    if(unit.players.some(p => p.buggy)) target.buggyCount += unit.size;
   });
 
-  // sort so smaller groups (3-balls) come first — they tee off first for speed of play
   return groups.map(g => g.players);
 }
 
