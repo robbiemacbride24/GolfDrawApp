@@ -1,59 +1,150 @@
-Lovey Golf Section — Outing Draw
+# ⛳ Lovey Golf Section Outing Draw
 
-A single-file web app for running a randomised golf group draw at section outings. Built for Lovey Golf Section (est. 2014) — add your players once, mark who's playing each outing, and let the app sort everyone into fair groups with an animated reveal.
+A single-page web application for creating a professional, animated golf outing draw.
 
-No backend, no build step, no install — it's one HTML file that runs entirely in the browser.
+Designed specifically for golf sections, society outings, club trips, and annual golf events, the app creates a dramatic screen-recording-friendly draw experience where players are randomly assigned into groups and revealed with polished animations.
 
-Features
+---
 
+## Features
 
-Saved player roster — add everyone in the section once. Names, handicaps, and buggy requirements are saved on your device so you never have to re-enter them.
-Mark who's in or out — before each outing, tick off who isn't coming. Only players marked "In" go into the draw.
-Handicaps — stored per player and editable in-app at any time (tap the handicap badge to update it), since they change throughout the season.
-Buggy pairing — players who need a buggy are automatically paired up two-to-a-buggy, and the draw avoids putting two buggy pairs in the same group unless there genuinely aren't enough groups to go around.
-Flexible group sizes — choose Automatic (best mix of 3s and 4s), Prefer 3-balls, or Prefer 4-balls.
-Animated draw reveal — a full-screen sequence (shuffle → group-by-group reveal → final results with confetti) for showing the draw on a big screen at the clubhouse.
-Light/dark mode toggle.
-Works on iPhone — installs to your Home Screen as a standalone app via Safari's "Add to Home Screen."
+### 🎲 Random Group Generation
 
+- Enter golfer names manually
+- Fully random group allocation
+- Fair and unbiased draw process
+- Automatic balancing of group sizes
 
-Usage
+### 🚗 Buggy Pair Support
 
+- Mark golfers who require a buggy/cart
+- Buggy players are paired together
+- Buggy pairs are automatically kept in separate groups where possible
+- Ensures practical course logistics without sacrificing randomness
 
-Open Lovely_Golf_Draw.html in a browser (see Installing on iPhone below for mobile).
-Step 1 — Add players to your roster. Add players one at a time (with name, handicap, and buggy requirement), or paste a list in the format Name, Handicap (one per line). This only needs doing once — the roster is saved automatically.
-Step 2 — Mark who's playing. Everyone defaults to "In." Tap a name to toggle them "Out" if they're not at this outing. You can also toggle buggy requirements here, or tap a player's handicap to edit it.
-Step 3 — Review the field. Confirms who's actually in today's draw.
-Step 4 — Choose a group format. Automatic, Prefer 3-balls, or Prefer 4-balls.
-Step 5 — Start Draw. Runs the full-screen animated reveal and shows the final groups.
+### 🎬 Animated Draw Experience
 
+- Professional reveal sequence
+- Individual golfer reveal animations
+- Dramatic group presentations
+- Designed for screen recording and sharing
+- Golf-themed visual styling
 
-Use Reset outing to clear today's In/Out selections without touching your saved roster, or Clear saved roster to wipe everyone permanently.
+### 📱 Mobile Friendly
 
-Installing on iPhone
+- Works on desktop, tablet, and mobile
+- Responsive design
+- Optimised for modern browsers
+- Installable as a web app on iPhone and Android
 
+### 💾 Data Persistence
 
-Get the HTML file onto your phone (AirDrop, email it to yourself, or save it via the Files app/iCloud Drive).
-Open it in Safari (not a Mail preview or other app).
-Tap the Share icon → Add to Home Screen → Add.
+- Golfer lists are saved locally in the browser
+- Reloading the page retains your setup
+- No account required
+- No server or backend needed
 
+---
 
-You'll get an app icon that opens full-screen, with your roster and handicaps saved locally on that device between visits.
+## How to Use
 
-Data storage
+### 1. Add Golfers
 
-Your roster is saved using the browser's local storage — there's no server and no account. This means:
+Enter all golfer names into the setup screen.
 
+### 2. Mark Buggy Players
 
-Data is private to the device and browser you used to add it.
-It persists across visits as long as you don't clear Safari's site data or remove the Home Screen icon.
-It does not sync between devices. If you use the app on a second phone or tablet, you'll need to build the roster there too.
+Tick the buggy/cart option for golfers who require a buggy.
 
+### 3. Start the Draw
 
-Tech
+Press **Start Draw** to begin the random allocation process.
 
-Plain HTML, CSS, and vanilla JavaScript in a single file — no frameworks, no dependencies, no build process. Just open it in a browser.
+### 4. Watch the Reveal
 
-License
+The app will:
 
-Built for personal/section use. Feel free to fork and adapt for your own golf section's outings.
+- Randomly generate groups
+- Create buggy pairings where required
+- Reveal groups using animated presentations
+- Display the final outing draw
+
+### 5. Save or Record
+
+Screen record the draw and share it with:
+
+- WhatsApp groups
+- Facebook pages
+- Club members
+- Golf society participants
+
+---
+
+## Technology
+
+Built using:
+
+- HTML5
+- CSS3
+- Vanilla JavaScript
+
+No frameworks, build tools, databases, or backend services are required.
+
+---
+
+## Hosting
+
+The app can be hosted for free using:
+
+- GitHub Pages
+- Netlify
+- Vercel
+- Any standard web hosting provider
+
+Because everything is contained within a single HTML file, deployment is extremely simple.
+
+---
+
+## Local Storage
+
+The application uses browser Local Storage to save:
+
+- Golfer names
+- Buggy requirements
+- App settings
+
+This data remains on the device being used.
+
+### Important
+
+If hosted online, Local Storage does **not** automatically sync between devices.
+
+To support multi-device access, a future version would require:
+
+- A database
+- Cloud storage/API integration
+- Optional user accounts
+
+---
+
+## Ideal Uses
+
+- Golf section outings
+- Society golf days
+- Ryder Cup style events
+- Captain's outings
+- Charity golf days
+- Annual golf trips
+- Team selection events
+
+---
+
+## Licence
+
+This project is intended for personal and club use.
+
+---
+
+### Lovey Golf Section Outing Draw
+
+*Bringing a little extra drama to the first tee.* ⛳🏌️‍♂️
