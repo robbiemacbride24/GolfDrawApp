@@ -1148,6 +1148,31 @@
   .page.active-page{ display: block; }
 
   /* ============================= UPCOMING OUTINGS ============================= */
+  .season-select{
+    width:100%;
+    padding:13px 16px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.18);
+    background:rgba(0,0,0,0.18);
+    color:var(--cream);
+    font-family:var(--font-body);
+    font-size:15px;
+    font-weight:700;
+    appearance:none;
+    -webkit-appearance:none;
+    background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path fill=%22%23C9A24B%22 d=%22M0 0l6 8 6-8z%22/></svg>');
+    background-repeat:no-repeat;
+    background-position:right 14px center;
+    cursor:pointer;
+  }
+  body.light-mode .season-select{ background-color: rgba(255,255,255,0.7); color: var(--ink); }
+  .empty-schedule{
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--cream-dim);
+    font-size: 14px;
+  }
+  .empty-schedule .pin{ font-size: 36px; display: block; margin-bottom: 10px; opacity: 0.5; }
   .outing-card{
     display: flex;
     align-items: center;
@@ -1157,7 +1182,15 @@
     background: rgba(0,0,0,0.16);
     border: 1px solid rgba(255,255,255,0.1);
     margin-bottom: 10px;
-    transition: border-color 0.2s ease;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    cursor: pointer;
+  }
+  .outing-card:hover{ background: rgba(255,255,255,0.05); }
+  .outing-edit-hint{
+    flex-shrink: 0;
+    font-size: 16px;
+    color: var(--cream-dim);
+    opacity: 0.6;
   }
   .outing-card.next-up{
     border-color: var(--gold);
@@ -1491,6 +1524,60 @@
   </div>
 </div>
 
+<!-- ADD / EDIT OUTING MODAL -->
+<div class="modal-overlay" id="outingModal">
+  <div class="modal-box">
+    <button class="modal-close" id="outingModalClose">✕</button>
+    <h2 class="modal-title" id="outingModalTitle">🏌️ Add Outing</h2>
+    <p class="modal-sub" id="outingModalSub">Add a new outing to this season's schedule.</p>
+    <form id="outingForm" autocomplete="off">
+      <div style="margin-bottom:14px;">
+        <span class="field-label">Outing name</span>
+        <input type="text" id="outingNameInput" maxlength="60" required style="
+          width:100%; padding:13px 16px; border-radius:8px;
+          border:1px solid rgba(255,255,255,0.18); background:rgba(0,0,0,0.18);
+          color:var(--cream); font-family:var(--font-body); font-size:15px;
+        ">
+      </div>
+      <div style="margin-bottom:14px;">
+        <span class="field-label">Venue</span>
+        <input type="text" id="outingVenueInput" maxlength="80" required style="
+          width:100%; padding:13px 16px; border-radius:8px;
+          border:1px solid rgba(255,255,255,0.18); background:rgba(0,0,0,0.18);
+          color:var(--cream); font-family:var(--font-body); font-size:15px;
+        ">
+      </div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px;">
+        <div style="flex:1; min-width:160px;">
+          <span class="field-label">Date</span>
+          <input type="date" id="outingDateInput" required style="
+            width:100%; padding:13px 16px; border-radius:8px;
+            border:1px solid rgba(255,255,255,0.18); background:rgba(0,0,0,0.18);
+            color:var(--cream); font-family:var(--font-body); font-size:15px;
+          ">
+        </div>
+        <div style="flex:1; min-width:160px;">
+          <span class="field-label">End date (optional, multi-day)</span>
+          <input type="date" id="outingEndDateInput" style="
+            width:100%; padding:13px 16px; border-radius:8px;
+            border:1px solid rgba(255,255,255,0.18); background:rgba(0,0,0,0.18);
+            color:var(--cream); font-family:var(--font-body); font-size:15px;
+          ">
+        </div>
+      </div>
+      <div class="buggy-check" style="margin-bottom:18px;">
+        <input type="checkbox" id="outingTrophyCheckbox">
+        <label for="outingTrophyCheckbox">🏆 Trophy / showpiece event (adds 🏆 to the name)</label>
+      </div>
+      <div id="outingFormNotice"></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button type="submit" class="btn btn-gold" style="flex:1;" id="outingSaveBtn">Save Outing</button>
+        <button type="button" class="btn btn-danger-ghost" id="outingDeleteBtn" style="display:none;">🗑 Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- PAGE: DRAW (existing setup screen) -->
 <div class="page active-page" id="drawPage">
 <div class="app-shell" id="setupScreen">
@@ -1715,14 +1802,26 @@
         <span class="brand-flag">⛳</span>
         <div>
           <p class="app-title">Lovey Golf <span class="accent">Section</span></p>
-          <p class="app-subtitle">2025 Schedule</p>
+          <p class="app-subtitle" id="schedSubtitle">Schedule</p>
         </div>
       </div>
     </div>
     <div class="glass panel">
-      <p class="eyebrow">Remaining outings</p>
-      <h2 class="panel-title">Outing Schedule</h2>
-      <div id="scheduleWrap"></div>
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+        <div style="flex:1; min-width:160px;">
+          <span class="field-label">Season</span>
+          <select id="seasonSelect" class="season-select"></select>
+        </div>
+        <button type="button" class="btn btn-outline" id="addSeasonBtn">+ Add Season</button>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <p class="eyebrow" id="schedEyebrow">Remaining outings</p>
+          <h2 class="panel-title" style="margin-bottom:0;">Outing Schedule</h2>
+        </div>
+        <button type="button" class="btn btn-gold" id="addOutingBtn">+ Add Outing</button>
+      </div>
+      <div id="scheduleWrap" style="margin-top:16px;"></div>
     </div>
   </div>
 </div><!-- /schedPage -->
@@ -2760,8 +2859,16 @@ function switchPage(pageId){
     pages[id].classList.toggle('active-page', id === pageId);
     navBtns[id].classList.toggle('active', id === pageId);
   });
+  if(pageId === 'drawPage') populateOutingSelect();
   if(pageId === 'historyPage') renderHistory();
-  if(pageId === 'schedPage') renderSchedule();
+  if(pageId === 'schedPage'){
+    // If a new year has ticked over since last render, snap back to the now-current season.
+    if(selectedSeason && Number(selectedSeason) < currentSeasonYear() && (outingsBySeason[selectedSeason]||[]).every(o => parseISODate(o.dateISO) < new Date())){
+      selectedSeason = ensureSeason(currentSeasonYear());
+    }
+    renderSeasonSelect();
+    renderSchedule();
+  }
   window.scrollTo(0, 0);
 }
 
@@ -2771,28 +2878,172 @@ $$('#bottomNav button').forEach(btn => {
 
 /* =====================================================================
    OUTING SCHEDULE
+   - outingsBySeason: { "2026": [ {id,name,venue,dateISO,endDateISO}, ... ], "2027": [...] }
+     Synced to Firebase under 'golfDrawOutings', same pattern as the roster.
+   - "Current season" = the calendar year that should drive the outing
+     selector on the Draw page. It auto-rolls forward on 1 Jan: any time
+     before 1 Jan next year, the current season is "this year"; once that
+     date passes, the new year becomes current automatically. The
+     Schedule page lets you browse any season via the dropdown, and you
+     can add a future season ahead of time (e.g. to start booking next
+     year's outings before the calendar rolls over).
 ===================================================================== */
-const OUTINGS = [
-  { name: 'Greenburn',    venue: 'Greenburn Golf Club',  date: new Date(2026, 5, 27) },  // June 27
-  { name: 'Deer Park',    venue: 'Deer Park Golf Club',  date: new Date(2026, 6, 11) },  // July 11
-  { name: 'Ballumbie',    venue: 'Ballumbie Castle',     date: new Date(2026, 7,  8) },  // Aug 8
-  { name: '🏆 Ryder Cup', venue: 'Drumoig Golf Centre', date: new Date(2026, 7, 28), endDate: new Date(2026, 7, 29) }, // Aug 28-29
-];
+const OUTINGS_KEY = 'loveyGolfOutings_v1'; // localStorage fallback
+let outingsBySeason = {};     // { "2026": [...] }
+let _outingIdCounter = 1;
+let selectedSeason = null;    // string year currently shown on Schedule page, e.g. "2026"
+let editingOutingId = null;   // null = adding new, otherwise editing this outing's id
+let _outingsFbSubscribed = false;
+
+function currentSeasonYear(){
+  return new Date().getFullYear();
+}
+
+function ensureSeason(year){
+  const key = String(year);
+  if(!outingsBySeason[key]) outingsBySeason[key] = [];
+  return key;
+}
+
+function defaultOutings(){
+  // Seed data so the schedule isn't empty on first run / first migration.
+  return [
+    { id: 1, name: 'Greenburn',    venue: 'Greenburn Golf Club',  dateISO: '2026-06-27', endDateISO: null },
+    { id: 2, name: 'Deer Park',    venue: 'Deer Park Golf Club',  dateISO: '2026-07-11', endDateISO: null },
+    { id: 3, name: 'Ballumbie',    venue: 'Ballumbie Castle',     dateISO: '2026-08-08', endDateISO: null },
+    { id: 4, name: '🏆 Ryder Cup', venue: 'Drumoig Golf Centre', dateISO: '2026-08-28', endDateISO: '2026-08-29' },
+  ];
+}
+
+function parseISODate(iso){
+  if(!iso) return null;
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+
+// All seasons that have any outings, sorted ascending, as numbers.
+function seasonYearsList(){
+  const years = Object.keys(outingsBySeason).map(Number).filter(y => outingsBySeason[String(y)].length > 0 || String(y) === selectedSeason);
+  const cy = currentSeasonYear();
+  if(!years.includes(cy)) years.push(cy);
+  return [...new Set(years)].sort((a,b) => a-b);
+}
+
+function saveOutingsToStorage(){
+  try{ localStorage.setItem(OUTINGS_KEY, JSON.stringify({ outingsBySeason, idCounter: _outingIdCounter })); }catch(e){}
+  if(!window._firebaseDb) return;
+  clearTimeout(_outingsSaveTimer);
+  _outingsSaveTimer = setTimeout(() => {
+    const { db, ref, set } = getFirebase();
+    set(ref(db, 'golfDrawOutings'), { outingsBySeason, idCounter: _outingIdCounter })
+      .catch(err => console.warn('Outings save failed:', err));
+  }, 300);
+}
+let _outingsSaveTimer = null;
+
+function subscribeToOutings(){
+  if(!window._firebaseDb) return;
+  if(_outingsFbSubscribed) return;
+  _outingsFbSubscribed = true;
+  const { db, ref, onValue } = getFirebase();
+  onValue(ref(db, 'golfDrawOutings'), (snapshot) => {
+    const data = snapshot.val();
+    if(!data || !data.outingsBySeason){
+      // Nothing in Firebase yet — try localStorage, else seed defaults, then push up.
+      if(!loadOutingsFromLocalStorage()){
+        outingsBySeason = { [String(currentSeasonYear())]: defaultOutings() };
+        _outingIdCounter = 5;
+      }
+      saveOutingsToStorage();
+    } else {
+      outingsBySeason = data.outingsBySeason;
+      if(typeof data.idCounter === 'number') _outingIdCounter = data.idCounter;
+    }
+    if(!selectedSeason || !outingsBySeason[selectedSeason]) selectedSeason = ensureSeason(currentSeasonYear());
+    renderSeasonSelect();
+    renderSchedule();
+    populateOutingSelect();
+  }, (err) => {
+    console.warn('Outings listen error:', err);
+    loadOutingsFromLocalStorage();
+    selectedSeason = ensureSeason(currentSeasonYear());
+    renderSeasonSelect();
+    renderSchedule();
+    populateOutingSelect();
+  });
+}
+
+function loadOutingsFromLocalStorage(){
+  try{
+    const raw = localStorage.getItem(OUTINGS_KEY);
+    if(!raw) return false;
+    const parsed = JSON.parse(raw);
+    if(parsed && parsed.outingsBySeason){
+      outingsBySeason = parsed.outingsBySeason;
+      if(typeof parsed.idCounter === 'number') _outingIdCounter = parsed.idCounter;
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function loadOutingsFromStorage(){
+  // Render instantly from local data while Firebase connects.
+  if(!loadOutingsFromLocalStorage()){
+    outingsBySeason = { [String(currentSeasonYear())]: defaultOutings() };
+    _outingIdCounter = 5;
+  }
+  selectedSeason = ensureSeason(currentSeasonYear());
+  renderSeasonSelect();
+  renderSchedule();
+  populateOutingSelect();
+
+  let attempts = 0;
+  const poll = setInterval(() => {
+    attempts++;
+    if(window._firebaseDb){
+      clearInterval(poll);
+      subscribeToOutings();
+    } else if(attempts > 40){
+      clearInterval(poll);
+    }
+  }, 100);
+}
+
+function renderSeasonSelect(){
+  const sel = $('#seasonSelect');
+  if(!sel) return;
+  const years = seasonYearsList();
+  sel.innerHTML = years.map(y => `<option value="${y}" ${String(y) === selectedSeason ? 'selected' : ''}>${y} Season${y === currentSeasonYear() ? ' (current)' : ''}</option>`).join('');
+  const subtitle = $('#schedSubtitle');
+  if(subtitle) subtitle.textContent = `${selectedSeason} Schedule`;
+}
 
 function renderSchedule(){
   const wrap = $('#scheduleWrap');
   if(!wrap) return;
+  const list = (outingsBySeason[selectedSeason] || []).slice().sort((a,b) => new Date(a.dateISO) - new Date(b.dateISO));
   const now = new Date();
   now.setHours(0,0,0,0);
 
-  const nextIdx = OUTINGS.findIndex(o => o.date >= now);
+  const eyebrow = $('#schedEyebrow');
+  if(eyebrow) eyebrow.textContent = Number(selectedSeason) === currentSeasonYear() ? 'Remaining outings' : `${selectedSeason} outings`;
 
-  wrap.innerHTML = OUTINGS.map((o, i) => {
-    const isPast = o.date < now;
+  if(list.length === 0){
+    wrap.innerHTML = `<div class="empty-schedule"><span class="pin">⛳</span>No outings added for ${selectedSeason} yet. Tap "+ Add Outing" above to book one in.</div>`;
+    return;
+  }
+
+  const nextIdx = list.findIndex(o => parseISODate(o.dateISO) >= now);
+
+  wrap.innerHTML = list.map((o, i) => {
+    const date = parseISODate(o.dateISO);
+    const endDate = parseISODate(o.endDateISO);
+    const isPast = date < now;
     const isNext = i === nextIdx;
 
-    const day   = o.date.getDate();
-    const month = o.date.toLocaleString('en-GB', { month: 'short' }).toUpperCase();
+    const day   = date.getDate();
+    const month = date.toLocaleString('en-GB', { month: 'short' }).toUpperCase();
 
     let badge, badgeClass;
     if(isPast){       badge = 'Played';   badgeClass = 'badge-past'; }
@@ -2801,19 +3052,19 @@ function renderSchedule(){
 
     let countdown = '';
     if(!isPast){
-      const days = Math.round((o.date - now) / 86400000);
+      const days = Math.round((date - now) / 86400000);
       if(days === 0)       countdown = '<span class="countdown-chip chip-today">🎉 Today!</span>';
       else if(days === 1)  countdown = '<span class="countdown-chip chip-soon">⏰ Tomorrow!</span>';
       else if(days <= 14)  countdown = `<span class="countdown-chip chip-soon">⏳ ${days} days to go</span>`;
       else                 countdown = `<span class="countdown-chip chip-future">📅 ${days} days away</span>`;
     }
 
-    const multiDay = o.endDate
-      ? `<div class="outing-multi-day">📅 ${o.date.getDate()} – ${o.endDate.getDate()} ${o.endDate.toLocaleString('en-GB',{month:'long'})} ${o.date.getFullYear()}</div>`
+    const multiDay = endDate
+      ? `<div class="outing-multi-day">📅 ${date.getDate()} – ${endDate.getDate()} ${endDate.toLocaleString('en-GB',{month:'long'})} ${date.getFullYear()}</div>`
       : '';
 
     return `
-      <div class="outing-card ${isPast ? 'past' : ''} ${isNext ? 'next-up' : ''}">
+      <div class="outing-card ${isPast ? 'past' : ''} ${isNext ? 'next-up' : ''}" data-outing-id="${o.id}">
         <div class="outing-date-block">
           <div class="outing-date-day">${day}</div>
           <div class="outing-date-month">${month}</div>
@@ -2825,9 +3076,139 @@ function renderSchedule(){
           ${countdown}
         </div>
         <span class="outing-badge ${badgeClass}">${badge}</span>
+        <span class="outing-edit-hint">✏️</span>
       </div>`;
   }).join('');
+
+  $$('#scheduleWrap .outing-card').forEach(card => {
+    card.addEventListener('click', () => openOutingModal(Number(card.dataset.outingId)));
+  });
 }
+
+/* ---------------------- Add / Edit Outing modal ---------------------- */
+function openOutingModal(outingId){
+  editingOutingId = outingId || null;
+  const form = $('#outingForm');
+  form.reset();
+  $('#outingFormNotice').innerHTML = '';
+
+  if(editingOutingId){
+    const o = (outingsBySeason[selectedSeason] || []).find(x => x.id === editingOutingId);
+    if(!o) return;
+    $('#outingModalTitle').textContent = '✏️ Edit Outing';
+    $('#outingModalSub').textContent = `Editing this outing for the ${selectedSeason} season.`;
+    $('#outingNameInput').value = o.name.replace(/🏆\s*/,'').trim();
+    $('#outingVenueInput').value = o.venue;
+    $('#outingDateInput').value = o.dateISO;
+    $('#outingEndDateInput').value = o.endDateISO || '';
+    $('#outingTrophyCheckbox').checked = o.name.includes('🏆');
+    $('#outingDeleteBtn').style.display = 'inline-flex';
+  } else {
+    $('#outingModalTitle').textContent = '🏌️ Add Outing';
+    $('#outingModalSub').textContent = `Add a new outing to the ${selectedSeason} season.`;
+    $('#outingDeleteBtn').style.display = 'none';
+  }
+  $('#outingModal').classList.add('open');
+}
+
+function closeOutingModal(){
+  $('#outingModal').classList.remove('open');
+  editingOutingId = null;
+}
+
+function populateOutingSelect(){
+  const sel = $('#outingSelect');
+  if(!sel) return;
+  const prevValue = sel.value;
+  sel.innerHTML = '<option value="">— No outing selected —</option>';
+  const seasonKey = ensureSeason(currentSeasonYear()); // draw page always follows the live current season
+  const list = (outingsBySeason[seasonKey] || []).slice().sort((a,b) => new Date(a.dateISO) - new Date(b.dateISO));
+  const now = new Date(); now.setHours(0,0,0,0);
+  let preSelected = false;
+  list.forEach(o => {
+    const date = parseISODate(o.dateISO);
+    const opt = document.createElement('option');
+    const cleanName = o.name.replace(/🏆\s*/,'').trim();
+    opt.value = cleanName;
+    const dateStr = date.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    opt.textContent = `${o.name} — ${dateStr}`;
+    if(cleanName === prevValue){
+      opt.selected = true;
+      preSelected = true;
+    } else if(!preSelected && date >= now){
+      opt.selected = true;
+      preSelected = true;
+    }
+    sel.appendChild(opt);
+  });
+}
+
+$('#seasonSelect').addEventListener('change', (e) => {
+  selectedSeason = e.target.value;
+  renderSeasonSelect();
+  renderSchedule();
+});
+
+$('#addSeasonBtn').addEventListener('click', () => {
+  const years = seasonYearsList();
+  const nextYear = Math.max(...years, currentSeasonYear()) + 1;
+  selectedSeason = ensureSeason(nextYear);
+  renderSeasonSelect();
+  renderSchedule();
+  saveOutingsToStorage();
+});
+
+$('#addOutingBtn').addEventListener('click', () => openOutingModal(null));
+$('#outingModalClose').addEventListener('click', closeOutingModal);
+$('#outingModal').addEventListener('click', (e) => { if(e.target === e.currentTarget) closeOutingModal(); });
+
+$('#outingDeleteBtn').addEventListener('click', () => {
+  if(!editingOutingId) return;
+  if(!confirm('Delete this outing? This cannot be undone.')) return;
+  outingsBySeason[selectedSeason] = (outingsBySeason[selectedSeason] || []).filter(o => o.id !== editingOutingId);
+  saveOutingsToStorage();
+  renderSchedule();
+  populateOutingSelect();
+  closeOutingModal();
+});
+
+$('#outingForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('#outingNameInput').value.trim();
+  const venue = $('#outingVenueInput').value.trim();
+  const dateISO = $('#outingDateInput').value;
+  const endDateISO = $('#outingEndDateInput').value || null;
+  const isTrophy = $('#outingTrophyCheckbox').checked;
+
+  if(!name || !venue || !dateISO){
+    $('#outingFormNotice').innerHTML = '<p style="color:var(--danger); font-size:13px; margin-bottom:10px;">Please fill in name, venue and date.</p>';
+    return;
+  }
+  if(endDateISO && endDateISO < dateISO){
+    $('#outingFormNotice').innerHTML = '<p style="color:var(--danger); font-size:13px; margin-bottom:10px;">End date can\'t be before the start date.</p>';
+    return;
+  }
+
+  const finalName = isTrophy ? `🏆 ${name}` : name;
+  ensureSeason(selectedSeason);
+
+  if(editingOutingId){
+    const list = outingsBySeason[selectedSeason];
+    const idx = list.findIndex(o => o.id === editingOutingId);
+    if(idx !== -1){
+      list[idx] = { ...list[idx], name: finalName, venue, dateISO, endDateISO };
+    }
+  } else {
+    const newOuting = { id: _outingIdCounter++, name: finalName, venue, dateISO, endDateISO };
+    outingsBySeason[selectedSeason].push(newOuting);
+  }
+
+  saveOutingsToStorage();
+  renderSchedule();
+  populateOutingSelect();
+  closeOutingModal();
+});
+
 
 /* =====================================================================
    DRAW HISTORY — save / load / render
@@ -3149,27 +3530,7 @@ $('#shareDrawBtn').addEventListener('click', () => {
 ===================================================================== */
 loadRosterFromStorage();
 renderEverything();
-renderSchedule();
-
-// Populate outing selector from the OUTINGS array
-(function(){
-  const sel = document.getElementById('outingSelect');
-  if(!sel) return;
-  const now = new Date(); now.setHours(0,0,0,0);
-  let preSelected = false;
-  OUTINGS.forEach(o => {
-    const opt = document.createElement('option');
-    opt.value = o.name.replace(/🏆\s*/,'').trim(); // strip emoji for cleaner storage
-    const dateStr = o.date.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
-    opt.textContent = `${o.name} — ${dateStr}`;
-    // Pre-select the first upcoming outing only
-    if(!preSelected && o.date >= now){
-      opt.selected = true;
-      preSelected = true;
-    }
-    sel.appendChild(opt);
-  });
-})();
+loadOutingsFromStorage();
 </script>
 
 </body>
