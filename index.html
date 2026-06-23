@@ -3003,14 +3003,16 @@ renderSchedule();
   const sel = document.getElementById('outingSelect');
   if(!sel) return;
   const now = new Date(); now.setHours(0,0,0,0);
+  let preSelected = false;
   OUTINGS.forEach(o => {
     const opt = document.createElement('option');
     opt.value = o.name.replace(/🏆\s*/,'').trim(); // strip emoji for cleaner storage
     const dateStr = o.date.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
     opt.textContent = `${o.name} — ${dateStr}`;
-    // Pre-select the next upcoming outing
-    if(o.date >= now && !sel.querySelector('option[selected]')){
+    // Pre-select the first upcoming outing only
+    if(!preSelected && o.date >= now){
       opt.selected = true;
+      preSelected = true;
     }
     sel.appendChild(opt);
   });
