@@ -122,6 +122,58 @@
   }
   body.light-mode .crest-watermark--setup{ opacity: 0.04; }
 
+  /* Bulk-add collapsible toggle */
+  .bulk-add-toggle{
+    background: none;
+    border: none;
+    color: var(--gold-bright);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .bulk-add-toggle .chevron{ display:inline-block; transition: transform 0.22s ease; }
+  .bulk-add-toggle.open .chevron{ transform: rotate(90deg); }
+  .bulk-add-section{ display: none; }
+  .bulk-add-section.open{ display: block; }
+
+  /* Draw summary chip (replaces Step 3 full list) */
+  .draw-summary-bar{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 20px;
+    background: rgba(0,0,0,0.15);
+    border-radius: var(--radius-sm);
+    margin-top: 4px;
+  }
+  .draw-summary-names{
+    font-size: 13.5px;
+    color: var(--cream-dim);
+    line-height: 1.5;
+  }
+  .draw-summary-names strong{ color: var(--cream); }
+  .draw-summary-expand{
+    background: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--cream-dim);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .draw-summary-expand:hover{ background: rgba(255,255,255,0.06); }
+  .draw-full-list{ display: none; margin-top: 14px; }
+  .draw-full-list.open{ display: block; }
+
   button{ font-family: inherit; cursor:pointer; }
   input[type="text"]{ font-family: inherit; }
 
@@ -1068,22 +1120,23 @@
     padding: 0 0 env(safe-area-inset-bottom);
   }
   .bottom-nav button{
+    min-height: 56px;
     flex: 1;
     background: none;
     border: none;
     color: var(--cream-dim);
     padding: 10px 4px 12px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.5px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     transition: color 0.2s ease;
     cursor: pointer;
   }
-  .bottom-nav button .nav-icon{ font-size: 20px; line-height: 1; }
+  .bottom-nav button .nav-icon{ font-size: 24px; line-height: 1; }
   .bottom-nav button.active{ color: var(--gold-bright); }
   .bottom-nav button:active{ opacity: 0.7; }
   body.light-mode .bottom-nav{ background: rgba(240,237,226,0.96); border-color: rgba(11,61,46,0.15); }
@@ -1164,9 +1217,26 @@
     display: inline-block;
     margin-top: 6px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.2px;
+  }
+  .chip-today{
+    background: rgba(201,162,75,0.2);
     color: var(--gold-bright);
-    font-weight: 600;
+    border: 1px solid rgba(201,162,75,0.4);
+  }
+  .chip-soon{
+    background: rgba(127,209,168,0.12);
+    color: var(--buggy);
+    border: 1px solid rgba(127,209,168,0.3);
+  }
+  .chip-future{
+    background: rgba(255,255,255,0.06);
+    color: var(--cream-dim);
+    border: 1px solid rgba(255,255,255,0.12);
   }
   .outing-multi-day{ font-size: 12px; color: var(--cream-dim); margin-top: 2px; }
 
@@ -1449,8 +1519,11 @@
     <p style="margin-top:-10px; margin-bottom:18px; font-size:13.5px; color:var(--cream-dim);">Add everyone in the section once — they're saved on this device for next time.</p>
 
     <form id="addPlayerForm" autocomplete="off">
-      <div style="margin-top:4px;">
-        <span class="field-label">Add players from a list (one per line, optionally "Name, Handicap")</span>
+      <button type="button" class="bulk-add-toggle" id="bulkToggleBtn">
+        <span class="chevron">▶</span> Add a list of players at once
+      </button>
+      <div class="bulk-add-section" id="bulkAddSection">
+        <span class="field-label">One per line — optionally "Name, Handicap" (e.g. Dave Smith, 14)</span>
         <textarea id="bulkPlayerInput" rows="5" style="
           width:100%;
           padding:12px;
@@ -1461,7 +1534,6 @@
           font-family: var(--font-body);
           font-size:14px;
         " ></textarea>
-
         <button type="button" class="btn btn-outline" id="addBulkBtn" style="margin-top:10px;">
           + Add List
         </button>
@@ -1517,7 +1589,8 @@
       </div>
       <span class="player-count-badge" id="drawCountBadge">0 players</span>
     </div>
-    <div id="drawListWrap"></div>
+    <div id="drawSummaryBar"></div>
+    <div class="draw-full-list" id="drawListWrap"></div>
   </div>
 
   <!-- ACTIONS -->
@@ -1982,6 +2055,12 @@ addPlayerForm.addEventListener('submit', (e) => {
   playerNameInput.focus();
 });
 
+// Bulk-add section toggle
+document.getElementById('bulkToggleBtn').addEventListener('click', function(){
+  this.classList.toggle('open');
+  document.getElementById('bulkAddSection').classList.toggle('open');
+});
+
 addBulkBtn.addEventListener('click', () => {
   const lines = bulkPlayerInput.value.split('\n');
   let added = 0, skipped = 0;
@@ -2017,9 +2096,15 @@ addBulkBtn.addEventListener('click', () => {
   }
 
   bulkPlayerInput.value = '';
-  validationNotice.innerHTML = skipped > 0
-    ? `<div class="notice info">✅ Added ${added} player${added === 1 ? '' : 's'} · skipped ${skipped} duplicate${skipped === 1 ? '' : 's'}.</div>`
-    : '';
+  // Collapse the bulk-add section after a successful add
+  const toggleBtn = document.getElementById('bulkToggleBtn');
+  const section   = document.getElementById('bulkAddSection');
+  toggleBtn.classList.remove('open');
+  section.classList.remove('open');
+  const msg = skipped > 0
+    ? `✅ Added <strong>${added}</strong> player${added === 1 ? '' : 's'} · skipped <strong>${skipped}</strong> already on roster.`
+    : `✅ Added <strong>${added}</strong> player${added === 1 ? '' : 's'} to the roster.`;
+  validationNotice.innerHTML = `<div class="notice info">${msg}</div>`;
   saveRosterToStorage();
   renderEverything();
 });
@@ -2193,22 +2278,38 @@ markAllOutBtn.addEventListener('click', () => {
 /* =====================================================================
    THE FIELD (Step 3 — live list of who's actually in today's draw)
 ===================================================================== */
+const drawSummaryBar = $('#drawSummaryBar');
+
 function renderDrawList(){
   const today = activePlayers();
   drawCountBadge.textContent = `${today.length} player${today.length === 1 ? '' : 's'}`;
 
   if(today.length === 0){
-    drawListWrap.innerHTML = `
-      <div class="empty-state">
-        <span class="pin">⛳</span>
-        Nobody's marked "In" yet — mark players In above to add them to today's draw.
+    drawSummaryBar.innerHTML = `
+      <div class="draw-summary-bar">
+        <span class="draw-summary-names">Nobody's marked <strong>In</strong> yet — tap names above to add them to today's draw.</span>
       </div>`;
+    drawListWrap.innerHTML = '';
+    drawListWrap.classList.remove('open');
     updateGroupPreview();
     return;
   }
 
   const sorted = [...today].sort((a, b) => a.name.localeCompare(b.name));
-  let rows = sorted.map((p, i) => `
+  const buggyCount = today.filter(p => p.buggy).length;
+  const namePreview = sorted.slice(0, 4).map(p => escapeHtml(p.name)).join(', ')
+    + (sorted.length > 4 ? ` +${sorted.length - 4} more` : '');
+
+  drawSummaryBar.innerHTML = `
+    <div class="draw-summary-bar">
+      <span class="draw-summary-names">
+        <strong>${today.length} players</strong> in the draw${buggyCount > 0 ? ` · 🚗 ${buggyCount} need a buggy` : ''}<br>
+        <span style="font-size:12.5px;">${namePreview}</span>
+      </span>
+      <button class="draw-summary-expand" id="drawExpandBtn">See full list ▼</button>
+    </div>`;
+
+  const rows = sorted.map((p, i) => `
     <tr>
       <td class="row-num">${i + 1}</td>
       <td class="player-name-cell">${escapeHtml(p.name)} ${p.buggy ? '<span title="Needs Buggy/Cart">🚗</span>' : ''}</td>
@@ -2218,16 +2319,14 @@ function renderDrawList(){
 
   drawListWrap.innerHTML = `
     <table class="scorecard-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Name</th>
-          <th>Hcp</th>
-        </tr>
-      </thead>
+      <thead><tr><th>#</th><th>Name</th><th>Hcp</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>
-  `;
+    </table>`;
+
+  $('#drawExpandBtn').addEventListener('click', () => {
+    const isOpen = drawListWrap.classList.toggle('open');
+    $('#drawExpandBtn').textContent = isOpen ? 'Hide list ▲' : 'See full list ▼';
+  });
 
   updateGroupPreview();
 }
@@ -2701,11 +2800,12 @@ function renderSchedule(){
     else {            badge = 'Upcoming'; badgeClass = 'badge-upcoming'; }
 
     let countdown = '';
-    if(isNext){
+    if(!isPast){
       const days = Math.round((o.date - now) / 86400000);
-      countdown = days === 0 ? '<span class="countdown-chip">🎉 Today!</span>'
-                : days === 1 ? '<span class="countdown-chip">⏰ Tomorrow!</span>'
-                : `<span class="countdown-chip">⏳ ${days} days to go</span>`;
+      if(days === 0)       countdown = '<span class="countdown-chip chip-today">🎉 Today!</span>';
+      else if(days === 1)  countdown = '<span class="countdown-chip chip-soon">⏰ Tomorrow!</span>';
+      else if(days <= 14)  countdown = `<span class="countdown-chip chip-soon">⏳ ${days} days to go</span>`;
+      else                 countdown = `<span class="countdown-chip chip-future">📅 ${days} days away</span>`;
     }
 
     const multiDay = o.endDate
@@ -3011,12 +3111,16 @@ function renderFinalGrid(){
   const grid = $('#finalGroupsGrid');
   if(!grid) return;
   grid.innerHTML = currentGroups.map((group, i) => {
+    const hasBuggy = group.some(p => p.buggy);
     const items = group.map(p => {
       const hcpText = formatHandicap(p.handicap);
-      return `<li>${p.buggy ? '🚗' : '⛳'} ${escapeHtml(p.name)}${hcpText !== null ? ` <span style="margin-left:auto; font-size:12.5px; color:var(--gold-bright); font-weight:700;">HCP ${hcpText}</span>` : ''}</li>`;
+      const buggyTag = p.buggy ? `<span style="font-size:11px; background:rgba(127,209,168,0.15); color:var(--buggy); border:1px solid rgba(127,209,168,0.3); border-radius:10px; padding:1px 7px; margin-left:6px; font-weight:700;">🚗 buggy</span>` : '';
+      return `<li>⛳ ${escapeHtml(p.name)}${buggyTag}${hcpText !== null ? ` <span style="margin-left:auto; font-size:12.5px; color:var(--gold-bright); font-weight:700;">HCP ${hcpText}</span>` : ''}</li>`;
     }).join('');
+    const buggyNote = hasBuggy ? `<div style="font-size:11.5px; color:var(--buggy); margin-bottom:8px; opacity:0.85;">🚗 Buggy required for this group</div>` : '';
     return `<div class="final-group-card" style="animation-delay:${i * 0.08}s">
       <h3>⛳ Group ${i+1} <span style="font-size:12px; color:var(--cream-dim); font-weight:500;">(${group.length}-ball)</span></h3>
+      ${buggyNote}
       <ul>${items}</ul>
     </div>`;
   }).join('');
