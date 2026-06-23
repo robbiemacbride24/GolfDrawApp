@@ -1483,6 +1483,27 @@
     <p class="eyebrow">Step 4</p>
     <h2 class="panel-title">Run the draw</h2>
     <div id="groupPreviewNotice"></div>
+    <div style="margin-bottom:18px;">
+      <span class="field-label">Link to outing (optional)</span>
+      <select id="outingSelect" style="
+        width:100%;
+        padding:13px 16px;
+        border-radius:8px;
+        border:1px solid rgba(255,255,255,0.18);
+        background:rgba(0,0,0,0.18);
+        color:var(--cream);
+        font-family:var(--font-body);
+        font-size:15px;
+        appearance:none;
+        -webkit-appearance:none;
+        background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path fill=%22%23C9A24B%22 d=%22M0 0l6 8 6-8z%22/></svg>');
+        background-repeat:no-repeat;
+        background-position:right 14px center;
+        cursor:pointer;
+      ">
+        <option value="">— No outing selected —</option>
+      </select>
+    </div>
     <button class="btn btn-gold btn-lg btn-block" id="startDrawBtn">🏌️ Start Draw</button>
     <div class="row-buttons">
       <button class="btn btn-outline" id="resetBtn" style="flex:1;">↺ Reset outing (keep saved roster)</button>
@@ -2500,7 +2521,9 @@ function runStage4Final(){
 
   // Save to history: on first draw add a new entry; on redraw update the existing one
   if(!_isRedraw){
-    _currentHistoryId = saveDrawToHistory(currentGroups).id;
+    const outingSelect = document.getElementById('outingSelect');
+    const outingName = outingSelect ? outingSelect.value : '';
+    _currentHistoryId = saveDrawToHistory(currentGroups, outingName).id;
   } else {
     updateDrawInHistory(_currentHistoryId, currentGroups);
   }
@@ -2602,10 +2625,10 @@ $$('#bottomNav button').forEach(btn => {
    OUTING SCHEDULE
 ===================================================================== */
 const OUTINGS = [
-  { name: 'Greenburn',  venue: 'Greenburn Golf Club',  date: new Date(2025, 5, 27) },  // June 27
-  { name: 'Deer Park',  venue: 'Deer Park Golf Club',  date: new Date(2025, 6, 11) },  // July 11
-  { name: 'Ballumbie',  venue: 'Ballumbie Castle',      date: new Date(2025, 7,  8) },  // Aug 8
-  { name: '🏆 Ryder Cup', venue: 'Drumoig Golf Centre', date: new Date(2025, 7, 28), endDate: new Date(2025, 7, 29) }, // Aug 28-29
+  { name: 'Greenburn',    venue: 'Greenburn Golf Club',  date: new Date(2026, 5, 27) },  // June 27
+  { name: 'Deer Park',    venue: 'Deer Park Golf Club',  date: new Date(2026, 6, 11) },  // July 11
+  { name: 'Ballumbie',    venue: 'Ballumbie Castle',     date: new Date(2026, 7,  8) },  // Aug 8
+  { name: '🏆 Ryder Cup', venue: 'Drumoig Golf Centre', date: new Date(2026, 7, 28), endDate: new Date(2026, 7, 29) }, // Aug 28-29
 ];
 
 function renderSchedule(){
@@ -2637,7 +2660,7 @@ function renderSchedule(){
     }
 
     const multiDay = o.endDate
-      ? `<div class="outing-multi-day">📅 ${o.date.getDate()} – ${o.endDate.getDate()} ${o.endDate.toLocaleString('en-GB',{month:'long'})} 2025</div>`
+      ? `<div class="outing-multi-day">📅 ${o.date.getDate()} – ${o.endDate.getDate()} ${o.endDate.toLocaleString('en-GB',{month:'long'})} ${o.date.getFullYear()}</div>`
       : '';
 
     return `
@@ -2662,11 +2685,12 @@ function renderSchedule(){
 ===================================================================== */
 let drawHistory = []; // [{ id, date, outingName, groups: [[{name,buggy,handicap},...]] }]
 
-function saveDrawToHistory(groups){
+function saveDrawToHistory(groups, outingName){
   const entry = {
     id: Date.now(),
     date: new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }),
     dateISO: new Date().toISOString(),
+    outingName: outingName || '',
     groups: groups.map(g => g.map(p => ({ name: p.name, buggy: p.buggy, handicap: p.handicap })))
   };
   drawHistory.unshift(entry); // newest first
@@ -2719,7 +2743,7 @@ function renderHistory(){
       <div class="history-card" id="hcard-${entry.id}">
         <div class="history-card-header" onclick="toggleHistoryCard('hcard-${entry.id}')">
           <div>
-            <div class="history-card-title">📅 ${entry.date}</div>
+            <div class="history-card-title">📅 ${entry.date}${entry.outingName ? ` · <span style="color:var(--gold-bright);font-style:italic;">${escapeHtml(entry.outingName)}</span>` : ''}</div>
             <div class="history-card-meta">${entry.groups.length} groups · ${entry.groups.reduce((s,g)=>s+g.length,0)} players</div>
           </div>
           <span class="history-chevron">▼</span>
@@ -2973,6 +2997,24 @@ $('#shareDrawBtn').addEventListener('click', () => {
 loadRosterFromStorage();
 renderEverything();
 renderSchedule();
+
+// Populate outing selector from the OUTINGS array
+(function(){
+  const sel = document.getElementById('outingSelect');
+  if(!sel) return;
+  const now = new Date(); now.setHours(0,0,0,0);
+  OUTINGS.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.name.replace(/🏆\s*/,'').trim(); // strip emoji for cleaner storage
+    const dateStr = o.date.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    opt.textContent = `${o.name} — ${dateStr}`;
+    // Pre-select the next upcoming outing
+    if(o.date >= now && !sel.querySelector('option[selected]')){
+      opt.selected = true;
+    }
+    sel.appendChild(opt);
+  });
+})();
 </script>
 
 </body>
