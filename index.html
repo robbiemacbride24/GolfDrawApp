@@ -1742,9 +1742,9 @@ function subscribeToFirebase(){
     // Ignore echoes of our own writes using the writeId stamp
     if(data && typeof data._writeId === 'number' && data._writeId === _pendingWriteId){
       console.log('[Firebase] Ignoring echo of our own write (writeId:', data._writeId, ')');
+      setSyncStatus('saved');
       return;
     }
-    const data = snapshot.val();
     if(!data || data.cleared === true) {
       if(!_firebaseInitialLoadDone && !data){
         // Nothing ever written — try to migrate from localStorage
