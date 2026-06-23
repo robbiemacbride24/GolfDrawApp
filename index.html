@@ -1684,12 +1684,10 @@ function setSyncStatus(state){ // 'syncing' | 'saved' | 'error' | 'offline'
   el.className = `sync-status sync-${state}`;
 }
 
-let _fbReady = false; // true once Firebase module is loaded
-let _firebaseInitialLoadDone = false; // true after first Firebase snapshot received
-let _clearInProgress = false;         // true while a clear is being written to Firebase
-let _lastLocalWriteId = 0;   // incremented each time THIS device writes
-let _pendingWriteId = 0;     // the writeId currently in-flight or last sent
-let _fbSubscribed = false;   // guard: only register onValue once
+let _firebaseInitialLoadDone = false;
+let _clearInProgress = false;
+let _fbSubscribed = false;   // prevent duplicate onValue listeners
+let _ignoreUntil = 0;        // timestamp: ignore Firebase echoes until this time
 
 function getFirebase(){
   return {
@@ -1700,27 +1698,25 @@ function getFirebase(){
   };
 }
 
-// Low-level write to Firebase — stamps a unique writeId so we can ignore our own echo
+// Write to Firebase and suppress our own echo for 2 seconds
 function _writeToFirebase(payload){
   if(!window._firebaseDb) return Promise.resolve();
-  const writeId = ++_lastLocalWriteId;
-  _pendingWriteId = writeId;
   setSyncStatus('syncing');
   const { db, ref, set } = getFirebase();
-  return set(ref(db, 'golfDraw'), { ...payload, _writeId: writeId })
-    .then(() => { setSyncStatus('saved'); })
+  return set(ref(db, 'golfDraw'), payload)
+    .then(() => {
+      _ignoreUntil = Date.now() + 2000; // ignore our own echo for 2s
+      setSyncStatus('saved');
+    })
     .catch(err => { console.warn('Firebase save failed:', err); setSyncStatus('error'); });
 }
 
 // Save roster + outIds to Firebase (debounced for rapid individual toggles)
 let _saveTimer = null;
 function saveRosterToStorage(){
-  // Always keep a local backup too
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter, outIds: [...outIds] })); }catch(e){}
-
-  if(!window._firebaseDb){ return; } // Firebase not loaded yet
-  if(_clearInProgress){ return; }    // don't let debounce overwrite a clear
-
+  if(!window._firebaseDb){ return; }
+  if(_clearInProgress){ return; }
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
     if(_clearInProgress){ return; }
@@ -1728,29 +1724,27 @@ function saveRosterToStorage(){
   }, 400);
 }
 
-// Listen for remote changes from other users and apply them
+// Listen for remote changes from other devices
 function subscribeToFirebase(){
   if(!window._firebaseDb) return;
-  if(_fbSubscribed) return; // CRITICAL: prevent duplicate listeners (caused double-firing bug)
+  if(_fbSubscribed) return; // prevent duplicate listeners
   _fbSubscribed = true;
   const { db, ref, onValue } = getFirebase();
   setSyncStatus('syncing');
 
   subscribeToHistory();
   onValue(ref(db, 'golfDraw'), (snapshot) => {
-    const data = snapshot.val();
-    // Ignore echoes of our own writes using the writeId stamp
-    if(data && typeof data._writeId === 'number' && data._writeId === _pendingWriteId){
-      console.log('[Firebase] Ignoring echo of our own write (writeId:', data._writeId, ')');
-      setSyncStatus('saved');
+    // If we recently wrote, this is likely our own echo — skip it
+    if(Date.now() < _ignoreUntil){
+      console.log('[Firebase] Skipping echo (within ignore window)');
       return;
     }
+    const data = snapshot.val();
+    console.log('[Firebase] Incoming update — raw outIds:', data && data.outIds, '| cleared:', data && data.cleared);
     if(!data || data.cleared === true) {
       if(!_firebaseInitialLoadDone && !data){
-        // Nothing ever written — try to migrate from localStorage
         migrateFromLocalStorage();
       } else {
-        // Another device cleared the roster — apply locally too
         roster = [];
         outIds = new Set();
         idCounter = 0;
@@ -1762,7 +1756,6 @@ function subscribeToFirebase(){
       return;
     }
     _firebaseInitialLoadDone = true;
-    // Apply remote state
     if(Array.isArray(data.roster)){
       roster = data.roster.map(p => ({
         id: p.id,
@@ -1773,13 +1766,13 @@ function subscribeToFirebase(){
     }
     if(typeof data.idCounter === 'number') idCounter = data.idCounter;
     if(Array.isArray(data.outIds)) outIds = new Set(data.outIds.map(Number));
-    console.log('[Firebase] Remote update applied — outIds:', [...outIds], '| roster size:', roster.length);
+    else outIds = new Set(); // outIds missing or empty = everyone is In
+    console.log('[Firebase] Applied — outIds size:', outIds.size, '| roster size:', roster.length);
     setSyncStatus('saved');
     renderEverything();
   }, (err) => {
     console.warn('Firebase listen error:', err);
     setSyncStatus('error');
-    // Fall back to localStorage if Firebase fails
     loadRosterFromLocalStorage();
     renderEverything();
   });
@@ -1979,7 +1972,7 @@ clearRosterBtn.addEventListener('click', () => {
   if(window._firebaseDb){
     // Write a sentinel so all listeners know this is an intentional clear
     _writeToFirebase({ cleared: true, roster: [], idCounter: 0, outIds: [] })
-      .then(() => { _clearInProgress = false; })
+      .then(() => { _clearInProgress = false; _ignoreUntil = 0; })
       .catch(() => { _clearInProgress = false; });
   } else {
     _clearInProgress = false;
@@ -2118,14 +2111,16 @@ rosterSearch.addEventListener('input', () => {
 
 markAllInBtn.addEventListener('click', () => {
   outIds.clear();
+  clearTimeout(_saveTimer);
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter, outIds: [] })); }catch(e){}
-  clearTimeout(_saveTimer); // cancel any pending debounced write
-  _writeToFirebase({ roster, idCounter, outIds: [] }); // write immediately, no debounce
+  _writeToFirebase({ roster, idCounter, outIds: [] });
   renderEverything();
 });
 markAllOutBtn.addEventListener('click', () => {
   roster.forEach(p => outIds.add(p.id));
-  saveRosterToStorage();
+  clearTimeout(_saveTimer);
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ roster, idCounter, outIds: [...outIds] })); }catch(e){}
+  _writeToFirebase({ roster, idCounter, outIds: [...outIds] });
   renderEverything();
 });
 
